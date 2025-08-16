@@ -1,5 +1,11 @@
 // Dashboard Navigation and Module Loader
 const modules = {
+  dashboard: {
+    name: 'Dashboard',
+    icon: 'bi-house',
+    html: 'pages/dashboard.html',
+    js: 'js/dashboard.js',
+  },
   doctors: {
     name: 'Doctors',
     icon: 'bi-person-badge',

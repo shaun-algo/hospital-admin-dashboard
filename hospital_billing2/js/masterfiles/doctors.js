@@ -4,7 +4,7 @@ class DoctorsManager {
     console.log('DoctorsManager constructor called');
     this.doctorsData = [];
     this.currentDoctorId = null;
-    this.baseApiUrl = '/hospital_billing2/api';
+    this.baseApiUrl = 'http://localhost/hospital_billing2/api';
     this.init();
   }
 
@@ -185,71 +185,71 @@ class DoctorsManager {
                 <form id="doctorForm" novalidate>
                   <input type="hidden" id="doctorId" value="${doctor ? doctor.doctorid : ''}" />
 
-                  <div class="row">
-                    <div class="col-md-6">
-                      <div class="mb-3">
-                        <label for="fullName" class="form-label">
-                          <i class="bi bi-person me-1"></i>Full Name
-                        </label>
-                        <input type="text" class="form-control" id="fullName"
-                               value="${doctor ? doctor.fullname : ''}"
-                               ${mode === 'view' ? 'readonly' : ''}
-                               placeholder="Enter doctor's full name" required>
-                        <div class="invalid-feedback">Please enter the doctor's full name.</div>
-                      </div>
-                    </div>
-                    <div class="col-md-6">
-                      <div class="mb-3">
-                        <label for="specialty" class="form-label">
-                          <i class="bi bi-award me-1"></i>Specialty
-                        </label>
-                        <input type="text" class="form-control" id="specialty"
-                               value="${doctor ? doctor.specialty : ''}"
-                               ${mode === 'view' ? 'readonly' : ''}
-                               placeholder="e.g., Cardiology, Neurology" required>
-                        <div class="invalid-feedback">Please enter the doctor's specialty.</div>
-                      </div>
-                    </div>
-                  </div>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label for="fullName" class="form-label">
+              <i class="bi bi-person me-1"></i>Full Name
+            </label>
+            <input type="text" class="form-control" id="fullName"
+                   value="${doctor ? doctor.fullname : ''}"
+                   ${mode === 'view' ? 'readonly' : ''}
+                   placeholder="Enter doctor's full name" required>
+            <div class="invalid-feedback">Please enter the doctor's full name.</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label for="specialty" class="form-label">
+              <i class="bi bi-award me-1"></i>Specialty
+            </label>
+            <input type="text" class="form-control" id="specialty"
+                   value="${doctor ? doctor.specialty : ''}"
+                   ${mode === 'view' ? 'readonly' : ''}
+                   placeholder="e.g., Cardiology, Neurology" required>
+            <div class="invalid-feedback">Please enter the doctor's specialty.</div>
+          </div>
+        </div>
+      </div>
 
-                  <div class="row">
-                    <div class="col-md-6">
-                      <div class="mb-3">
-                        <label for="contactNo" class="form-label">
-                          <i class="bi bi-telephone me-1"></i>Contact Number
-                        </label>
-                        <input type="tel" class="form-control" id="contactNo"
-                               value="${doctor ? doctor.contact_no : ''}"
-                               ${mode === 'view' ? 'readonly' : ''}
-                               placeholder="+63 XXX XXX XXXX" required>
-                        <div class="invalid-feedback">Please enter a valid contact number.</div>
-                      </div>
-                    </div>
-                    <div class="col-md-6">
-                      <div class="mb-3">
-                        <label for="status" class="form-label">
-                          <i class="bi bi-toggle-on me-1"></i>Status
-                        </label>
-                        <select class="form-select" id="status" ${mode === 'view' ? 'disabled' : ''}>
-                          <option value="Active" ${doctor && doctor.status === 'Active' ? 'selected' : ''}>🟢 Active</option>
-                          <option value="Inactive" ${doctor && doctor.status === 'Inactive' ? 'selected' : ''}>⚫ Inactive</option>
-                          <option value="Suspended" ${doctor && doctor.status === 'Suspended' ? 'selected' : ''}>🟡 Suspended</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label for="contactNo" class="form-label">
+              <i class="bi bi-telephone me-1"></i>Contact Number
+            </label>
+            <input type="tel" class="form-control" id="contactNo"
+                   value="${doctor ? doctor.contact_no : ''}"
+                   ${mode === 'view' ? 'readonly' : ''}
+                   placeholder="+63 XXX XXX XXXX" required>
+            <div class="invalid-feedback">Please enter a valid contact number.</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label for="status" class="form-label">
+              <i class="bi bi-toggle-on me-1"></i>Status
+            </label>
+            <select class="form-select" id="status" ${mode === 'view' ? 'disabled' : ''}>
+              <option value="Active" ${doctor && doctor.status === 'Active' ? 'selected' : ''}>🟢 Active</option>
+              <option value="Inactive" ${doctor && doctor.status === 'Inactive' ? 'selected' : ''}>⚫ Inactive</option>
+              <option value="Suspended" ${doctor && doctor.status === 'Suspended' ? 'selected' : ''}>🟡 Suspended</option>
+            </select>
+          </div>
+        </div>
+      </div>
 
-                  ${mode === 'view' ? `
-                    <div class="row">
-                      <div class="col-12">
-                        <div class="alert alert-info">
-                          <i class="bi bi-info-circle me-2"></i>
-                          <strong>Doctor ID:</strong> ${doctor.doctorid} |
-                          <strong>Created:</strong> ${new Date().toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                  ` : ''}
+      ${mode === 'view' ? `
+        <div class="row">
+          <div class="col-12">
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle me-2"></i>
+              <strong>Doctor ID:</strong> ${doctor.doctorid} |
+              <strong>Created:</strong> ${new Date().toLocaleDateString()}
+            </div>
+          </div>
+        </div>
+      ` : ''}
                 </form>
               </div>
               <div class="modal-footer">
@@ -261,45 +261,31 @@ class DoctorsManager {
                     <i class="bi bi-check-circle me-2"></i>${mode === 'edit' ? 'Update' : 'Save'}
                   </button>
                 `}
-              </div>
-            </div>
-          </div>
+      </div>
+      </div>
+      </div>
         </div>`;
     }
 
     // Append modal to body
-    console.log('About to append modal to body');
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    console.log('Modal HTML added to body');
 
     // Get the modal element
     const modalElement = document.getElementById('doctorModal');
-    console.log('Modal element found:', modalElement);
-
     if (modalElement) {
-      // Create and show Bootstrap modal
       if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-        console.log('Bootstrap is available, creating modal instance');
         const modal = new bootstrap.Modal(modalElement, {
           backdrop: true,
           keyboard: true,
           focus: true
         });
-
-        console.log('Bootstrap modal instance created:', modal);
-
-        // Show the modal
         modal.show();
-        console.log('Modal show() called');
 
-        // Setup event listeners for the modal
         if (mode === 'delete') {
           const confirmBtn = document.getElementById('confirmDeleteDoctor');
           if (confirmBtn) {
             confirmBtn.onclick = async () => {
               await this.deleteDoctor(doctor.doctorid);
-              modal.hide();
-              this.loadDoctors();
             };
           }
         } else if (mode !== 'view') {
@@ -307,22 +293,14 @@ class DoctorsManager {
           if (saveBtn) {
             saveBtn.onclick = async () => {
               await this.saveDoctor(mode);
-              modal.hide();
-              this.loadDoctors();
             };
           }
         }
 
-        // Setup form validation
         if (mode !== 'view' && mode !== 'delete') {
           this.setupFormValidation();
         }
-
-      } else {
-        console.error('Bootstrap Modal not available!');
       }
-    } else {
-      console.error('Modal element not found after adding to body!');
     }
   }
 
@@ -351,8 +329,6 @@ class DoctorsManager {
 
   async saveDoctor(mode) {
     const form = document.getElementById('doctorForm');
-
-    // Validate all required fields
     const requiredFields = form.querySelectorAll('.form-control[required]');
     let isValid = true;
 
@@ -382,30 +358,39 @@ class DoctorsManager {
     formData.append('operation', mode === 'edit' ? 'updateDoctor' : 'insertDoctor');
     formData.append('json', JSON.stringify(data));
 
+    const saveBtn = document.getElementById('saveDoctorBtn');
+    const originalText = saveBtn.innerHTML;
+
     try {
-      // Show loading state
-      const saveBtn = document.getElementById('saveDoctorBtn');
-      const originalText = saveBtn.innerHTML;
       saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
       saveBtn.disabled = true;
 
       await axios.post(`${this.baseApiUrl}/doctors.php`, formData);
       this.showAlert(`Doctor ${mode === 'edit' ? 'updated' : 'added'} successfully!`, 'success');
+
+      setTimeout(() => {
+        const modalElement = document.getElementById('doctorModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) modal.hide();
+        this.loadDoctors();
+      }, 2000);
+
     } catch (error) {
       console.error('Error saving doctor:', error);
       this.showAlert('Error saving doctor. Please try again.', 'danger');
     } finally {
-      // Restore button state
-      const saveBtn = document.getElementById('saveDoctorBtn');
-      saveBtn.innerHTML = originalText;
-      saveBtn.disabled = false;
+      setTimeout(() => {
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+      }, 2000);
     }
   }
 
   async deleteDoctor(id) {
+    const deleteBtn = document.getElementById('confirmDeleteDoctor');
+    const originalText = deleteBtn.innerHTML;
+
     try {
-      const deleteBtn = document.getElementById('confirmDeleteDoctor');
-      const originalText = deleteBtn.innerHTML;
       deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
       deleteBtn.disabled = true;
 
@@ -415,22 +400,31 @@ class DoctorsManager {
 
       await axios.post(`${this.baseApiUrl}/doctors.php`, formData);
       this.showAlert('Doctor deleted successfully!', 'success');
+
+      setTimeout(() => {
+        const modalElement = document.getElementById('doctorModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) modal.hide();
+        this.loadDoctors();
+      }, 2000);
+
     } catch (error) {
       console.error('Error deleting doctor:', error);
       this.showAlert('Error deleting doctor. Please try again.', 'danger');
     } finally {
-      const deleteBtn = document.getElementById('confirmDeleteDoctor');
-      deleteBtn.innerHTML = originalText;
-      deleteBtn.disabled = false;
+      setTimeout(() => {
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.disabled = false;
+      }, 2000);
     }
   }
 
   showAlert(message, type) {
-    // Remove any existing alerts
     document.querySelectorAll('.alert').forEach(alert => alert.remove());
 
     const alertHtml = `
-      <div class="alert alert-${type} alert-dismissible fade show position-fixed" style="top: 20px; right: 20px; z-index: 9999; min-width: 350px;">
+      <div class="alert alert-${type} alert-dismissible fade show position-fixed"
+           style="top: 20px; right: 20px; z-index: 9999; min-width: 350px;">
         <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -438,7 +432,6 @@ class DoctorsManager {
 
     document.body.insertAdjacentHTML('beforeend', alertHtml);
 
-    // Auto-hide after 4 seconds
     setTimeout(() => {
       const alert = document.querySelector('.alert');
       if (alert) {
@@ -448,10 +441,3 @@ class DoctorsManager {
     }, 4000);
   }
 }
-
-// Initialize when DOM is loaded
-// Note: This is now handled by the dashboard.js module loader
-// document.addEventListener('DOMContentLoaded', () => {
-//   console.log('Doctors.js DOMContentLoaded event fired');
-//   new DoctorsManager();
-// });
