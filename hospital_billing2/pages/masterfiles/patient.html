@@ -1,0 +1,117 @@
+<!-- patient.html - Patient Masterfile CRUD Interface -->
+<div class="container-fluid p-4">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h3 class="mb-1 text-primary">
+            <i class="bi bi-person me-2"></i>Patient Management
+          </h3>
+          <p class="text-muted mb-0">Manage patient records, demographics, and medical history</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="addPatientBtn">
+          <i class="bi bi-plus-circle me-2"></i>Add New Patient
+        </button>
+      </div>
+
+      <!-- Data Table -->
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Patient Records</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0" id="patientTable">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>Patient Name</th>
+                  <th>Age</th>
+                  <th>Gender</th>
+                  <th>Contact</th>
+                  <th>Blood Type</th>
+                  <th>Status</th>
+                  <th width="200">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="patientTableBody">
+                <!-- Placeholder data -->
+                <tr>
+                  <td><span class="badge bg-secondary">P001</span></td>
+                  <td><strong>Juan Dela Cruz</strong></td>
+                  <td>35</td>
+                  <td><span class="badge bg-info">Male</span></td>
+                  <td><i class="bi bi-telephone me-1"></i>+63 912 345 6789</td>
+                  <td><span class="badge bg-danger">O+</span></td>
+                  <td><span class="badge bg-success">Active</span></td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-info me-1" title="View Details">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning me-1" title="Edit Patient">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" title="Delete Patient">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="badge bg-secondary">P002</span></td>
+                  <td><strong>Maria Santos</strong></td>
+                  <td>28</td>
+                  <td><span class="badge bg-info">Female</span></td>
+                  <td><i class="bi bi-telephone me-1"></i>+63 923 456 7890</td>
+                  <td><span class="badge bg-danger">A+</span></td>
+                  <td><span class="badge bg-success">Active</span></td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-info me-1" title="View Details">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning me-1" title="Edit Patient">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" title="Delete Patient">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="badge bg-secondary">P003</span></td>
+                  <td><strong>Pedro Reyes</strong></td>
+                  <td>42</td>
+                  <td><span class="badge bg-info">Male</span></td>
+                  <td><i class="bi bi-telephone me-1"></i>+63 934 567 8901</td>
+                  <td><span class="badge bg-danger">B+</span></td>
+                  <td><span class="badge bg-success">Active</span></td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-info me-1" title="View Details">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning me-1" title="Edit Patient">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" title="Delete Patient">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Card -->
+      <div class="card mt-4">
+        <div class="card-body text-center text-muted">
+          <i class="bi bi-person display-4 mb-3 text-primary"></i>
+          <h4>Patient Masterfile</h4>
+          <p class="mb-0">CRUD interface coming soon. This module will allow you to manage patient records, demographics, and medical history.</p>
+          <small class="text-muted">Features: Add, Edit, View, Delete patients with comprehensive medical record management.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

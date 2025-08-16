@@ -1,0 +1,117 @@
+<!-- medicine.html - Medicine Masterfile CRUD Interface -->
+<div class="container-fluid p-4">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h3 class="mb-1 text-primary">
+            <i class="bi bi-capsule me-2"></i>Medicine Management
+          </h3>
+          <p class="text-muted mb-0">Manage medicine inventory, pricing, and stock levels</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="addMedicineBtn">
+          <i class="bi bi-plus-circle me-2"></i>Add New Medicine
+        </button>
+      </div>
+
+      <!-- Data Table -->
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">Medicine Inventory</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0" id="medicineTable">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>Medicine Name</th>
+                  <th>Generic Name</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Stock</th>
+                  <th>Status</th>
+                  <th width="200">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="medicineTableBody">
+                <!-- Placeholder data -->
+                <tr>
+                  <td><span class="badge bg-secondary">1</span></td>
+                  <td><strong>Paracetamol 500mg</strong></td>
+                  <td>Acetaminophen</td>
+                  <td><span class="badge bg-info">Pain Relief</span></td>
+                  <td><span class="badge bg-success">₱5.00</span></td>
+                  <td><span class="badge bg-warning">150</span></td>
+                  <td><span class="badge bg-success">Active</span></td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-info me-1" title="View Details">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning me-1" title="Edit Medicine">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" title="Delete Medicine">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="badge bg-secondary">2</span></td>
+                  <td><strong>Amoxicillin 500mg</strong></td>
+                  <td>Amoxicillin</td>
+                  <td><span class="badge bg-info">Antibiotic</span></td>
+                  <td><span class="badge bg-success">₱15.00</span></td>
+                  <td><span class="badge bg-warning">75</span></td>
+                  <td><span class="badge bg-success">Active</span></td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-info me-1" title="View Details">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning me-1" title="Edit Medicine">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" title="Delete Medicine">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="badge bg-secondary">3</span></td>
+                  <td><strong>Omeprazole 20mg</strong></td>
+                  <td>Omeprazole</td>
+                  <td><span class="badge bg-info">Gastric</span></td>
+                  <td><span class="badge bg-success">₱25.00</span></td>
+                  <td><span class="badge bg-warning">45</span></td>
+                  <td><span class="badge bg-success">Active</span></td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-info me-1" title="View Details">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning me-1" title="Edit Medicine">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" title="Delete Medicine">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Card -->
+      <div class="card mt-4">
+        <div class="card-body text-center text-muted">
+          <i class="bi bi-capsule display-4 mb-3 text-primary"></i>
+          <h4>Medicine Masterfile</h4>
+          <p class="mb-0">CRUD interface coming soon. This module will allow you to manage medicine inventory, pricing, and stock levels.</p>
+          <small class="text-muted">Features: Add, Edit, View, Delete medicines with stock tracking and pricing management.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
