@@ -12,28 +12,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-class LabTestCategory {
+class Role {
     private function connect() {
         include "connection.php";
         return (new Database())->connect();
     }
 
-    function getAllCategories($showInactive = false) {
+    function getAllRoles($showInactive = false) {
         try {
             $conn = $this->connect();
 
             if ($showInactive) {
                 $stmt = $conn->prepare("
-                    SELECT labtestcatid, name, description, handling_fee, turnaround_days, is_active
-                    FROM Lab_Test_Category
-                    ORDER BY name
+                    SELECT roleid, name, permissions, status
+                    FROM Role
+                    ORDER BY roleid ASC
                 ");
             } else {
                 $stmt = $conn->prepare("
-                    SELECT labtestcatid, name, description, handling_fee, turnaround_days, is_active
-                    FROM Lab_Test_Category
-                    WHERE is_active = 1
-                    ORDER BY name
+                    SELECT roleid, name, permissions, status
+                    FROM Role
+                    WHERE status = 'Active'
+                    ORDER BY roleid ASC
                 ");
             }
 
@@ -44,17 +44,17 @@ class LabTestCategory {
         }
     }
 
-    function getCategoryById($id) {
+    function getRoleById($id) {
         try {
             if (empty($id)) {
-                echo json_encode(["error" => "Category ID is required"]);
+                echo json_encode(["error" => "Role ID is required"]);
                 return;
             }
             $conn = $this->connect();
             $stmt = $conn->prepare("
-                SELECT labtestcatid, name, description, handling_fee, turnaround_days, is_active
-                FROM Lab_Test_Category
-                WHERE labtestcatid = :id
+                SELECT roleid, name, permissions, status
+                FROM Role
+                WHERE roleid = :id
                 LIMIT 1
             ");
             $stmt->bindParam(":id", $id, PDO::PARAM_INT);
@@ -65,122 +65,127 @@ class LabTestCategory {
         }
     }
 
-    function insertCategory($data) {
+    function insertRole($data) {
         try {
             $conn = $this->connect();
-            if (empty($data['name']) || empty($data['handling_fee']) || empty($data['turnaround_days'])) {
-                echo json_encode(["success" => false, "error" => "Missing required fields"]);
+            $data = is_array($data) ? $data : json_decode($data, true);
+
+            if (empty($data['name'])) {
+                echo json_encode(["success" => false, "error" => "Role name is required"]);
                 return;
             }
+
             $stmt = $conn->prepare("
-                INSERT INTO Lab_Test_Category (name, description, handling_fee, turnaround_days, is_active)
-                VALUES (:name, :description, :handling_fee, :turnaround_days, 1)
+                INSERT INTO Role (name, permissions, status)
+                VALUES (:name, :permissions, 'Active')
             ");
             $stmt->execute([
                 ":name" => $data['name'],
-                ":description" => $data['description'] ?? '',
-                ":handling_fee" => $data['handling_fee'],
-                ":turnaround_days" => $data['turnaround_days']
+                ":permissions" => $data['permissions'] ?? null
             ]);
-            echo json_encode(["success" => true, "labtestcatid" => $conn->lastInsertId()]);
+
+            echo json_encode(["success" => true, "roleid" => $conn->lastInsertId()]);
         } catch (Exception $e) {
             echo json_encode(["success" => false, "error" => $e->getMessage()]);
         }
     }
 
-    function updateCategory($data) {
+    function updateRole($data) {
         try {
             $conn = $this->connect();
-            if (empty($data['labtestcatid']) || empty($data['name']) || empty($data['handling_fee']) || empty($data['turnaround_days'])) {
+            $data = is_array($data) ? $data : json_decode($data, true);
+
+            if (empty($data['roleid']) || empty($data['name']) || empty($data['status'])) {
                 echo json_encode(["success" => false, "error" => "Missing required fields"]);
                 return;
             }
+
             $stmt = $conn->prepare("
-                UPDATE Lab_Test_Category
+                UPDATE Role
                 SET name = :name,
-                    description = :description,
-                    handling_fee = :handling_fee,
-                    turnaround_days = :turnaround_days
-                WHERE labtestcatid = :labtestcatid
+                    permissions = :permissions,
+                    status = :status
+                WHERE roleid = :roleid
             ");
             $stmt->execute([
                 ":name" => $data['name'],
-                ":description" => $data['description'] ?? '',
-                ":handling_fee" => $data['handling_fee'],
-                ":turnaround_days" => $data['turnaround_days'],
-                ":labtestcatid" => $data['labtestcatid']
+                ":permissions" => $data['permissions'] ?? null,
+                ":status" => $data['status'],
+                ":roleid" => $data['roleid']
             ]);
+
             echo json_encode(["success" => true]);
         } catch (Exception $e) {
             echo json_encode(["success" => false, "error" => $e->getMessage()]);
         }
     }
 
-    function deleteCategory($id) {
+    function deleteRole($id) {
         try {
             if (empty($id)) {
-                echo json_encode(["success" => false, "error" => "Category ID is required"]);
+                echo json_encode(["success" => false, "error" => "Role ID is required"]);
                 return;
             }
             $conn = $this->connect();
             // Soft delete: mark inactive
-            $stmt = $conn->prepare("UPDATE Lab_Test_Category SET is_active = 0 WHERE labtestcatid = :id");
+            $stmt = $conn->prepare("UPDATE Role SET status = 'Inactive' WHERE roleid = :id");
             $stmt->bindParam(":id", $id, PDO::PARAM_INT);
             $stmt->execute();
-            echo json_encode(["success" => true, "message" => "Category deactivated"]);
+            echo json_encode(["success" => true, "message" => "Role deactivated"]);
         } catch (Exception $e) {
             echo json_encode(["success" => false, "error" => $e->getMessage()]);
         }
     }
 
-    function restoreCategory($id) {
+    function restoreRole($id) {
         try {
             if (empty($id)) {
-                echo json_encode(["success" => false, "error" => "Category ID is required"]);
+                echo json_encode(["success" => false, "error" => "Role ID is required"]);
                 return;
             }
             $conn = $this->connect();
-            $stmt = $conn->prepare("UPDATE Lab_Test_Category SET is_active = 1 WHERE labtestcatid = :id");
+            $stmt = $conn->prepare("UPDATE Role SET status = 'Active' WHERE roleid = :id");
             $stmt->bindParam(":id", $id, PDO::PARAM_INT);
             $stmt->execute();
-            echo json_encode(["success" => true, "message" => "Category restored"]);
+            echo json_encode(["success" => true, "message" => "Role restored"]);
         } catch (Exception $e) {
             echo json_encode(["success" => false, "error" => $e->getMessage()]);
         }
     }
 }
 
-// ===== REQUEST HANDLING =====
+// ==== REQUEST HANDLING ====
 $input = json_decode(file_get_contents("php://input"), true) ?? [];
 $params = array_merge($_GET, $_POST, $input);
 
 $operation = $params['operation'] ?? '';
-$categoryid = $params['labtestcatid'] ?? '';
+$roleid = $params['roleid'] ?? '';
 $showInactive = !empty($params['showInactive']);
 $jsonData = is_array($params['json'] ?? null) ? $params['json'] : json_decode($params['json'] ?? "{}", true);
-if (empty($jsonData) && !empty($input) && $operation !== 'getAllCategories') {
+if (empty($jsonData) && !empty($input) && $operation !== 'getAllRoles') {
     $jsonData = $input;
 }
 
-$category = new LabTestCategory();
+$role = new Role();
+
 switch ($operation) {
-    case "getAllCategories":
-        $category->getAllCategories($showInactive);
+    case "getAllRoles":
+        $role->getAllRoles($showInactive);
         break;
-    case "getCategoryById":
-        $category->getCategoryById($categoryid);
+    case "getRoleById":
+        $role->getRoleById($roleid);
         break;
-    case "insertCategory":
-        $category->insertCategory($jsonData);
+    case "insertRole":
+        $role->insertRole($jsonData);
         break;
-    case "updateCategory":
-        $category->updateCategory($jsonData);
+    case "updateRole":
+        $role->updateRole($jsonData);
         break;
-    case "deleteCategory":
-        $category->deleteCategory($categoryid);
+    case "deleteRole":
+        $role->deleteRole($roleid);
         break;
-    case "restoreCategory":
-        $category->restoreCategory($categoryid);
+    case "restoreRole":
+        $role->restoreRole($roleid);
         break;
     default:
         echo json_encode(["error" => "Invalid operation: {$operation}"]);

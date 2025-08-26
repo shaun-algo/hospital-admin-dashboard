@@ -31,10 +31,8 @@ class Doctor {
             $stmt->execute();
             $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode($result);
-            return;
         } catch (Exception $e) {
             echo json_encode(["error" => $e->getMessage()]);
-            return;
         }
     }
 
@@ -55,10 +53,8 @@ class Doctor {
             $stmt->bindParam(":id", $id, PDO::PARAM_INT);
             $stmt->execute();
             echo json_encode($stmt->fetch(PDO::FETCH_ASSOC) ?: []);
-            return;
         } catch (Exception $e) {
             echo json_encode(["error" => $e->getMessage()]);
-            return;
         }
     }
 
@@ -81,10 +77,8 @@ class Doctor {
                 ":status"      => $data['status']
             ]);
             echo json_encode(["success" => true, "doctorid" => $conn->lastInsertId()]);
-            return;
         } catch (Exception $e) {
             echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            return;
         }
     }
 
@@ -109,10 +103,8 @@ class Doctor {
                 ":doctorid"    => $data['doctorid']
             ]);
             echo json_encode(["success" => true]);
-            return;
         } catch (Exception $e) {
             echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            return;
         }
     }
 
@@ -128,10 +120,8 @@ class Doctor {
             $stmt->bindParam(":id", $id, PDO::PARAM_INT);
             $stmt->execute();
             echo json_encode(["success" => true]);
-            return;
         } catch (Exception $e) {
             echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            return;
         }
     }
 }

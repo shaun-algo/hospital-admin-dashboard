@@ -15,9 +15,7 @@ class LabTestManager {
 
   setupEventListeners() {
     const addBtn = document.getElementById('addTestBtn');
-    if (addBtn) {
-      addBtn.onclick = () => this.openModal('add');
-    }
+    if (addBtn) addBtn.onclick = () => this.openModal('add');
 
     const tbody = document.getElementById('testsTableBody');
     if (tbody) {
@@ -40,7 +38,8 @@ class LabTestManager {
     try {
       const response = await axios.get(`${this.baseApiUrl}/lab_test_category.php?operation=getAllCategories`);
       if (response.data && Array.isArray(response.data)) {
-        this.categoriesData = response.data;
+        // Only show active categories
+        this.categoriesData = response.data.filter(cat => cat.is_active == 1);
       } else {
         this.categoriesData = [];
       }
@@ -93,25 +92,25 @@ class LabTestManager {
 
     tbody.innerHTML = this.testsData.map(test => `
       <tr>
-        <td><span class="badge bg-secondary">${test.testid}</span></td>
         <td><strong>${test.name}</strong></td>
         <td><span class="badge bg-info">${test.category_name || 'Unknown'}</span></td>
-        <td>${test.description || '<span class="text-muted">No description</span>'}</td>
         <td><span class="badge bg-success">₱${parseFloat(test.price).toFixed(2)}</span></td>
         <td>
-          <button class="btn btn-sm btn-outline-info me-1" data-id="${test.testid}" data-action="view">
+        <div style="display: flex; flex-direction: row; gap: 8px; flex-wrap: nowrap;">
+          <button class="btn btn-sm btn-info me-1" style="flex-shrink: 0; " data-id="${test.testid}" data-action="view">
             <i class="bi bi-eye"></i>
           </button>
-          <button class="btn btn-sm btn-outline-warning me-1" data-id="${test.testid}" data-action="edit">
+          <button class="btn btn-sm btn-warning me-1" style="flex-shrink: 0;" data-id="${test.testid}" data-action="edit">
             <i class="bi bi-pencil"></i>
           </button>
-          <button class="btn btn-sm btn-outline-danger" data-id="${test.testid}" data-action="delete">
+          <button class="btn btn-sm btn-danger" style="flex-shrink: 0;" data-id="${test.testid}" data-action="delete">
             <i class="bi bi-trash"></i>
           </button>
-        </td>
-      </tr>
-    `).join('');
-  }
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
 
   openModal(mode = 'add', test = null) {
     document.querySelectorAll('#testModal').forEach(m => m.remove());
@@ -172,7 +171,7 @@ class LabTestManager {
                     <div class="col-md-6 mb-3">
                       <label for="testCategory" class="form-label">Category</label>
                       <select class="form-select" id="testCategory" ${mode === 'view' ? 'disabled' : ''} required>
-                        <option value="">Select Category</option>
+                        <option value="">-- Select Category --</option>
                         ${categoryOptions}
                       </select>
                       <div class="invalid-feedback">Please select a category.</div>
@@ -347,3 +346,5 @@ class LabTestManager {
     }, 4000);
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => new LabTestManager());
