@@ -1,4 +1,3 @@
-// Roles Manager - Updated
 class RoleManager {
   constructor() {
     this.rolesData = [];
@@ -46,7 +45,11 @@ class RoleManager {
 
       if (!action) return;
 
-      if (['view', 'edit', 'delete', 'restore'].includes(action)) {
+      if (action === 'delete') {
+        this.confirmDeleteRole(role || { roleid: id });
+      } else if (action === 'restore') {
+        this.confirmRestoreRole(role || { roleid: id });
+      } else if (['view', 'edit'].includes(action)) {
         this.openModal(action, role || { roleid: id });
       }
     });
@@ -133,104 +136,59 @@ class RoleManager {
   }
 
   openModal(mode = 'add', role = null) {
-    // remove any existing role modal
-    const oldModal = document.getElementById('roleModal');
-    if (oldModal) oldModal.remove();
+    // remove existing modal
+    this.removeOldModal('roleModal');
 
     const isView = mode === 'view';
-    let modalHtml = '';
-
-    // delete modal
-    if (mode === 'delete') {
-      modalHtml = `
-        <div class="modal fade" id="roleModal" tabindex="-1">
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-header bg-light text-danger">
-                <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Deactivate Role</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body text-center">
-                <p>Deactivate <strong>${this.escape(role?.name ?? '')}</strong>?</p>
-                <div class="alert alert-warning mt-3"><i class="bi bi-info-circle me-2"></i>This will hide but not permanently delete the role.</div>
-              </div>
-              <div class="modal-footer">
-                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-danger" id="confirmDeleteRole">Deactivate</button>
-              </div>
+    let modalHtml = `
+      <div class="modal fade" id="roleModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header bg-light">
+              <h5 class="modal-title text-primary fw-bold">
+                <i class="bi bi-${mode === 'edit' ? 'pencil-square' : isView ? 'eye' : 'shield-lock'} me-2"></i>
+                ${mode === 'edit' ? 'Edit' : isView ? 'View' : 'Add'} Role
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-          </div>
-        </div>`;
-    }
-    // restore modal
-    else if (mode === 'restore') {
-      modalHtml = `
-        <div class="modal fade" id="roleModal" tabindex="-1">
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-header bg-light text-success">
-                <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Role</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body text-center">
-                <p>Restore role <strong>${this.escape(role?.name ?? '')}</strong>?</p>
-              </div>
-              <div class="modal-footer">
-                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-success" id="confirmRestoreRole">Restore</button>
-              </div>
-            </div>
-          </div>
-        </div>`;
-    }
-    // add / edit / view modal
-    else {
-      modalHtml = `
-        <div class="modal fade" id="roleModal" tabindex="-1">
-          <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-              <div class="modal-header bg-light">
-                <h5 class="modal-title text-primary fw-bold">
-                  <i class="bi bi-${mode === 'edit' ? 'pencil-square' : isView ? 'eye' : 'people'} me-2"></i>
-                  ${mode === 'edit' ? 'Edit' : isView ? 'View' : 'Add'} Role
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body">
-                <form id="roleForm" novalidate>
-                  <input type="hidden" id="roleId" value="${role?.roleid ?? ''}" />
+            <div class="modal-body">
+              <form id="roleForm" novalidate>
+                <input type="hidden" id="roleId" value="${role?.roleid ?? ''}" />
 
-                  <div class="mb-3">
-                    <label for="roleName" class="form-label">Role Name</label>
-                    <input type="text" class="form-control" id="roleName" value="${role ? this.escape(role.name) : ''}" ${isView ? 'readonly' : ''} required>
-                    <div class="invalid-feedback">Please enter the role name.</div>
+                <div class="mb-3">
+                  <label for="roleName" class="form-label">Role Name</label>
+                  <input type="text" class="form-control" id="roleName"
+                    value="${role ? this.escape(role.name) : ''}" ${isView ? 'readonly' : ''} required>
+                  <div class="invalid-feedback">Please enter the role name.</div>
+                </div>
+
+                <!-- Permissions Section -->
+                <div class="mb-3">
+                  <label class="form-label fw-bold">Permissions</label>
+                  <div id="permissionsCheckboxes" class="row g-3"></div>
+                  <div class="invalid-feedback d-block mt-2" id="permissionError" style="display:none;">
+                    Please select at least one permission.
                   </div>
+                </div>
 
-                  <div class="mb-3">
-                    <label class="form-label">Permissions</label>
-                    <div id="permissionsCheckboxes" class="d-flex flex-wrap gap-2"></div>
-                    <div class="invalid-feedback d-block mt-2" id="permissionError" style="display:none;">Select at least one permission.</div>
-                  </div>
-
-                  ${mode === 'add' ? '' : `
-                  <div class="mb-3">
-                    <label for="roleStatus" class="form-label">Status</label>
-                    <select class="form-select" id="roleStatus" ${isView ? 'disabled' : ''} required>
-                      <option value="Active" ${role?.status === 'Active' ? 'selected' : ''}>Active</option>
-                      <option value="Inactive" ${role?.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                    </select>
-                    <div class="invalid-feedback">Please select a status.</div>
-                  </div>`}
-                </form>
-              </div>
-              <div class="modal-footer">
-                <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                ${isView ? '' : `<button class="btn btn-primary" id="saveRoleBtn">${mode === 'edit' ? 'Update' : 'Save'}</button>`}
-              </div>
+                ${mode === 'add' ? '' : `
+                <div class="mb-3">
+                  <label for="roleStatus" class="form-label">Status</label>
+                  <select class="form-select" id="roleStatus" ${isView ? 'disabled' : ''} required>
+                    <option value="Active" ${role?.status === 'Active' ? 'selected' : ''}>Active</option>
+                    <option value="Inactive" ${role?.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                  </select>
+                  <div class="invalid-feedback">Please select a status.</div>
+                </div>`}
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+              ${isView ? '' : `<button class="btn btn-primary" id="saveRoleBtn">${mode === 'edit' ? 'Update' : 'Save'}</button>`}
             </div>
           </div>
-        </div>`;
-    }
+        </div>
+      </div>`;
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
@@ -239,35 +197,128 @@ class RoleManager {
     const modal = new bootstrap.Modal(modalElement, { backdrop: 'static' });
     modal.show();
 
-    if (mode === 'delete') {
-      document.getElementById('confirmDeleteRole').onclick = () => this.deleteRole(role.roleid, modal);
-    } else if (mode === 'restore') {
-      document.getElementById('confirmRestoreRole').onclick = () => this.restoreRole(role.roleid, modal);
-    } else if (!isView) {
+    if (!isView) {
       document.getElementById('saveRoleBtn').onclick = () => this.saveRole(mode, modal);
       this.setupFormValidation();
     }
 
-    // render permissions checkboxes
+    // Render grouped permissions
+    const categories = {
+      "General": ["ALL", "Manage Roles", "Manage Users"],
+      "Patients & Doctors": ["Manage Patients", "Manage Doctors", "Manage Admissions"],
+      "Billing": ["Manage Billing", "Manage Payments"],
+      "Rooms & Labs": ["Manage Rooms", "Manage Room Assignments", "Manage Lab Tests", "Manage Lab Requests"],
+      "Prescriptions": ["Manage Prescriptions", "Manage Doctor Assignments"]
+    };
+
+    const selectedPerms = role?.permissions ? role.permissions.split(',').map(p => p.trim()) : [];
     const permContainer = document.getElementById('permissionsCheckboxes');
-    if (permContainer) {
-      permContainer.innerHTML = this.allPermissions.map(perm => {
-        const checked = role?.permissions?.split(',').map(p => p.trim()).includes(perm);
-        const safeId = perm.replace(/\s+/g, '_');
-        return `
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="${perm}" id="perm_${safeId}"
-              ${checked ? 'checked' : ''} ${isView ? 'disabled' : ''}>
-            <label class="form-check-label" for="perm_${safeId}">${perm}</label>
-          </div>`;
-      }).join('');
+
+    permContainer.innerHTML = Object.entries(categories).map(([cat, perms]) => {
+      const color = cat === "General" ? "primary" :
+                    cat === "Patients & Doctors" ? "success" :
+                    cat === "Billing" ? "danger" :
+                    cat === "Rooms & Labs" ? "warning" : "info";
+
+      return `
+        <div class="col-md-6">
+          <div class="border rounded p-3 h-100">
+            <h6 class="text-${color} mb-2"><i class="bi bi-dot"></i> ${cat}</h6>
+            ${perms.map(p => {
+              const safeId = p.replace(/\s+/g, '_');
+              const checked = selectedPerms.includes(p) ? 'checked' : '';
+              const disabled = isView ? 'disabled' : '';
+              return `
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" value="${p}" id="perm_${safeId}" ${checked} ${disabled}>
+                  <label class="form-check-label" for="perm_${safeId}">${p}</label>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }).join('');
+
+    // Add event listener for ALL checkbox to toggle label text
+    const allCheckbox = document.querySelector('#permissionsCheckboxes input[value="ALL"]');
+    const allLabel = allCheckbox ? allCheckbox.nextElementSibling : null;
+
+    if (allCheckbox && allLabel) {
+      allCheckbox.addEventListener('change', function () {
+        if (this.checked) {
+          allLabel.textContent = 'Select All';
+        } else {
+          allLabel.textContent = 'ALL';
+        }
+      });
     }
   }
 
-  // (rest of your methods unchanged: setupFormValidation, validatePermissions, validateField, clearFieldValidation, saveRole, deleteRole, restoreRole, showAlert, escape)
+  confirmDeleteRole(role) {
+    this.removeOldModal('confirmDeleteModal');
+    const modalHtml = `
+      <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title text-danger">Confirm Delete Role</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              Are you sure you want to delete the role <strong>${this.escape(role.name || '')}</strong>?
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-danger" id="confirmDeleteRoleBtn">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 
+    const modalElement = document.getElementById('confirmDeleteModal');
+    const modal = new bootstrap.Modal(modalElement, { backdrop: 'static' });
+    modal.show();
 
+    document.getElementById('confirmDeleteRoleBtn').onclick = () => {
+      this.deleteRole(role.roleid, modal);
+    };
+  }
 
+  confirmRestoreRole(role) {
+    this.removeOldModal('confirmRestoreModal');
+    const modalHtml = `
+      <div class="modal fade" id="confirmRestoreModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title text-success">Confirm Restore Role</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              Are you sure you want to restore the role <strong>${this.escape(role.name || '')}</strong>?
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-success" id="confirmRestoreRoleBtn">Restore</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const modalElement = document.getElementById('confirmRestoreModal');
+    const modal = new bootstrap.Modal(modalElement, { backdrop: 'static' });
+    modal.show();
+
+    document.getElementById('confirmRestoreRoleBtn').onclick = () => {
+      this.restoreRole(role.roleid, modal);
+    };
+  }
+
+  removeOldModal(modalId) {
+    const oldModal = document.getElementById(modalId);
+    if (oldModal) oldModal.remove();
+  }
 
   setupFormValidation() {
     const form = document.getElementById('roleForm');
@@ -368,7 +419,7 @@ class RoleManager {
   }
 
   async deleteRole(id, modal) {
-    const deleteBtn = document.getElementById('confirmDeleteRole');
+    const deleteBtn = document.getElementById('confirmDeleteRoleBtn');
     const originalText = deleteBtn ? deleteBtn.innerHTML : '';
 
     try {
@@ -397,7 +448,7 @@ class RoleManager {
   }
 
   async restoreRole(id, modal) {
-    const restoreBtn = document.getElementById('confirmRestoreRole');
+    const restoreBtn = document.getElementById('confirmRestoreRoleBtn');
     const originalText = restoreBtn ? restoreBtn.innerHTML : '';
 
     try {

@@ -33,11 +33,11 @@ class Floor {
         }
     }
 
-    // Returns only non-deleted floors
+    // Return only floors that are not soft deleted
     function getAllFloors() {
         try {
             $conn = $this->connect();
-            $stmt = $conn->prepare("SELECT floorid, name, is_deleted FROM Floor WHERE is_deleted = 0 ORDER BY name");
+            $stmt = $conn->prepare("SELECT floorid, name, is_deleted FROM Floor ORDER BY name");
             $stmt->execute();
             $floors = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $this->respond($floors);
@@ -93,7 +93,7 @@ class Floor {
         }
     }
 
-    // Soft-delete floor only if no active (non-soft deleted) rooms reference it
+    // Soft-delete floor only if no active rooms reference it
     function deleteFloor($floorid) {
         try {
             if (empty($floorid)) {
@@ -102,12 +102,14 @@ class Floor {
 
             $conn = $this->connect();
 
+            // Check if any active (not soft deleted) rooms exist on this floor
             $checkRooms = $conn->prepare("SELECT COUNT(*) FROM Room WHERE floorid = :floorid AND is_deleted = 0");
             $checkRooms->execute([":floorid" => $floorid]);
             if ($checkRooms->fetchColumn() > 0) {
                 $this->respond(["success" => false, "error" => "Cannot delete floor assigned to active rooms"], 409);
             }
 
+            // Soft delete floor
             $stmt = $conn->prepare("UPDATE Floor SET is_deleted = 1 WHERE floorid = :floorid");
             if (!$stmt->execute([":floorid" => $floorid])) {
                 $errorInfo = $stmt->errorInfo();
@@ -127,7 +129,10 @@ class Floor {
             if (empty($floorid)) {
                 $this->respond(["success" => false, "error" => "Floor ID is required"], 422);
             }
+
             $conn = $this->connect();
+
+            // Restore the floor
             $stmt = $conn->prepare("UPDATE Floor SET is_deleted = 0 WHERE floorid = :floorid");
             $stmt->execute([":floorid" => $floorid]);
             $this->respond(["success" => true]);
@@ -138,6 +143,7 @@ class Floor {
     }
 }
 
+// Handle incoming operations
 $input = json_decode(file_get_contents("php://input"), true) ?? [];
 $params = array_merge($_GET, $_POST, $input);
 $operation = $params['operation'] ?? '';
@@ -172,3 +178,4 @@ switch ($operation) {
         echo json_encode(["error" => "Invalid operation"]);
         break;
 }
+?>

@@ -23,6 +23,7 @@ class MedicineManager {
       const tbody = document.getElementById('medicineTableBody');
       if (!tbody) return;
 
+      // Filter visible rows by text content
       Array.from(tbody.rows).forEach(row =>
         row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none'
       );
@@ -39,7 +40,10 @@ class MedicineManager {
       if (!id || !action) return;
 
       const medicine = this.medicines.find(m => String(m.medicineid) === id);
-      if (!medicine) return;
+      if (!medicine) {
+        this.showAlert('Selected medicine not found.', 'danger');
+        return;
+      }
 
       this.openModal(action, medicine);
     });
@@ -48,11 +52,11 @@ class MedicineManager {
   async loadGenericMedicines() {
     try {
       const res = await axios.get(this.genericMedicineApiUrl, { params: { operation: 'getAllGenericMedicines' } });
-      if (res.data.error) throw new Error(res.data.error);
+      if (!res.data.success) throw new Error(res.data.error || 'Failed to load generic medicines');
       this.genericMedicines = Array.isArray(res.data.data) ? res.data.data : [];
     } catch (err) {
       this.genericMedicines = [];
-      console.error('Error loading generic medicines:', err);
+      this.showAlert('Error loading generic medicines: ' + err.message, 'danger');
     }
   }
 
@@ -60,15 +64,11 @@ class MedicineManager {
     const tbody = document.getElementById('medicineTableBody');
     if (!tbody) return;
 
-    tbody.innerHTML = `
-      <tr><td colspan="8" class="text-center py-5">
-        <div class="spinner-border text-primary" role="status"></div>
-        <p class="mt-2">Loading medicines...</p>
-      </td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading medicines...</p></td></tr>`;
 
     try {
       const res = await axios.get(this.baseApiUrl, { params: { operation: 'getAllMedicines' } });
-      if (res.data.error) throw new Error(res.data.error);
+      if (!res.data.success) throw new Error(res.data.error || 'Failed to load medicines');
       this.medicines = Array.isArray(res.data.data) ? res.data.data : [];
       this.renderTable();
     } catch (err) {
@@ -91,10 +91,10 @@ class MedicineManager {
         <td>${m.description ?? ''}</td>
         <td><span class="badge bg-success">₱${parseFloat(m.price).toFixed(2)}</span></td>
         <td>
-        <div style="display: flex; flex-direction: row; gap: 8px; flex-wrap: nowrap;">
-          <button class="btn btn-sm btn-info me-1" style="flex-shrink: 0;" data-id="${m.medicineid}" data-action="view" title="View"><i class="bi bi-eye"></i></button>
-          <button class="btn btn-sm btn-warning me-1" style="flex-shrink: 0;" data-id="${m.medicineid}" data-action="edit" title="Edit"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-sm btn-danger" style="flex-shrink: 0;" data-id="${m.medicineid}" data-action="delete" title="Delete"><i class="bi bi-trash"></i></button>
+          <div style="display: flex; flex-direction: row; gap: 8px; flex-wrap: nowrap;">
+            <button class="btn btn-sm btn-info me-1" style="flex-shrink: 0;" data-id="${m.medicineid}" data-action="view" title="View"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-warning me-1" style="flex-shrink: 0;" data-id="${m.medicineid}" data-action="edit" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" style="flex-shrink: 0;" data-id="${m.medicineid}" data-action="delete" title="Delete"><i class="bi bi-trash"></i></button>
           </div>
         </td>
       </tr>`).join('');
@@ -116,8 +116,7 @@ class MedicineManager {
         <p><strong>Name:</strong> ${medicine.brand_name}</p>
         <p><strong>Generic Name:</strong> ${medicine.generic_name ?? ''}</p>
         <p><strong>Description:</strong> ${medicine.description ?? ''}</p>
-        <p><strong>Price:</strong> ₱${parseFloat(medicine.price).toFixed(2)}</p>
-      `;
+        <p><strong>Price:</strong> ₱${parseFloat(medicine.price).toFixed(2)}</p>`;
     } else if (mode === 'delete') {
       title = 'Confirm Delete Medicine';
       body = `<p>Are you sure you want to delete medicine <strong>${medicine.brand_name}</strong>?</p>`;
@@ -213,15 +212,19 @@ class MedicineManager {
       return;
     }
 
+    if (isNaN(data.price) || data.price < 0) {
+      alertContainer.innerHTML = `<div class="alert alert-danger">Please enter a valid non-negative price.</div>`;
+      return;
+    }
+
     const formData = new FormData();
     formData.append('operation', mode === 'edit' ? 'updateMedicine' : 'insertMedicine');
     formData.append('json', JSON.stringify(data));
 
     try {
       const res = await axios.post(this.baseApiUrl, formData);
-      if (res.data.error) throw new Error(res.data.error);
-      if (res.data.success === false) {
-        alertContainer.innerHTML = `<div class="alert alert-danger">${res.data.error}</div>`;
+      if (!res.data.success) {
+        alertContainer.innerHTML = `<div class="alert alert-danger">${res.data.error || 'Unknown error'}</div>`;
         return;
       }
       this.showAlert(`Medicine ${mode === 'edit' ? 'updated' : 'added'} successfully!`, 'success');
@@ -233,15 +236,20 @@ class MedicineManager {
   }
 
   async deleteMedicine(medicineid, modal) {
+    if (!medicineid || isNaN(parseInt(medicineid, 10))) {
+      this.showAlert('Invalid medicine ID for deletion.', 'danger');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('operation', 'deleteMedicine');
     formData.append('medicineid', medicineid);
 
     try {
       const res = await axios.post(this.baseApiUrl, formData);
-      if (res.data.error) throw new Error(res.data.error);
-      if (res.data.success === false) throw new Error(res.data.error);
-
+      if (!res.data.success) {
+        throw new Error(res.data.error || 'Unknown error');
+      }
       this.showAlert('Medicine deleted successfully!', 'success');
       modal.hide();
       await this.loadMedicines();
@@ -270,4 +278,5 @@ class MedicineManager {
     }
   }
 }
+
 document.addEventListener('DOMContentLoaded', () => { new MedicineManager(); });

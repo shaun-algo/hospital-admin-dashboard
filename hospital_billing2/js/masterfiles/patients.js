@@ -419,4 +419,4 @@ class PatientManager {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => new PatientManager());
+document.addEventListener('DOMContentLoaded', () => new PatientManager()); 

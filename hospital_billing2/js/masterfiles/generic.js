@@ -34,10 +34,11 @@ class GenericMedicineManager {
       const id = btn.getAttribute('data-id');
       const action = btn.getAttribute('data-action');
       if (!id || !action) return;
-
       const genericMedicine = this.genericMedicines.find(g => String(g.genericid) === id);
-      if (!genericMedicine) return;
-
+      if (!genericMedicine && action !== 'add') {
+        this.showAlert('Generic medicine not found', 'danger');
+        return;
+      }
       this.openModal(action, genericMedicine);
     });
   }
@@ -48,17 +49,17 @@ class GenericMedicineManager {
 
     tbody.innerHTML = `
       <tr><td colspan="2" class="text-center py-5">
-      <div class="spinner-border text-primary" role="status"></div>
-      <p class="mt-2">Loading generic medicines...</p></td></tr>`;
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2">Loading generic medicines...</p>
+      </td></tr>`;
 
     try {
       const res = await axios.get(this.baseApiUrl, { params: { operation: 'getAllGenericMedicines' } });
-      if (res.data.error) throw new Error(res.data.error);
+      if (!res.data.success) throw new Error(res.data.error || 'Failed to load generic medicines');
       this.genericMedicines = Array.isArray(res.data.data) ? res.data.data : [];
       this.renderTable();
     } catch (err) {
-      tbody.innerHTML =
-        `<tr><td colspan="2" class="text-danger text-center py-4">Failed to load: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="2" class="text-danger text-center py-4">Failed to load: ${err.message}</td></tr>`;
     }
   }
 
@@ -67,8 +68,7 @@ class GenericMedicineManager {
     if (!tbody) return;
 
     if (this.genericMedicines.length === 0) {
-      tbody.innerHTML = `
-        <tr><td colspan="2" class="text-muted text-center py-4">No generic medicines found</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="2" class="text-muted text-center py-4">No generic medicines found</td></tr>`;
       return;
     }
 
@@ -76,29 +76,30 @@ class GenericMedicineManager {
       <tr>
         <td><strong>${generic.generic_name}</strong></td>
         <td>
-        <div style="display: flex; flex-direction: row; gap: 8px; flex-wrap: nowrap;">
-          <button class="btn btn-sm btn-info me-1" style="flex-shrink: 0;" data-id="${generic.genericid}" data-action="view" title="View"><i class="bi bi-eye"></i></button>
-          <button class="btn btn-sm btn-warning me-1" style="flex-shrink: 0;" data-id="${generic.genericid}" data-action="edit" title="Edit"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-sm btn-danger" style="flex-shrink: 0;" data-id="${generic.genericid}" data-action="delete" title="Delete"><i class="bi bi-trash"></i></button>
-        </div>
-      </td>
-
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-sm btn-info" data-id="${generic.genericid}" data-action="view" title="View"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-warning" data-id="${generic.genericid}" data-action="edit" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" data-id="${generic.genericid}" data-action="delete" title="Delete"><i class="bi bi-trash"></i></button>
+          </div>
+        </td>
       </tr>`).join('');
   }
 
-  openModal(mode, genericMedicine = null) {
-    document.querySelectorAll('#genericMedicineModal').forEach(modal => modal.remove());
+  openModal(mode, genericMedicine=null) {
+    document.querySelectorAll('#genericMedicineModal').forEach(m => m.remove());
 
-    let title = mode === 'add' ? 'Add New Generic Medicine' : (mode === 'edit' ? 'Edit Generic Medicine' : 'View Generic Medicine');
+    let title = mode === 'add' ? 'Add New Generic Medicine' :
+                mode === 'edit' ? 'Edit Generic Medicine' :
+                'View Generic Medicine';
     let body = '';
 
     if (mode === 'view') {
       body = `<p><strong>Generic Name:</strong> ${genericMedicine.generic_name}</p>`;
     } else if (mode === 'delete') {
       title = 'Confirm Delete Generic Medicine';
-      body = `<p>Are you sure you want to delete generic medicine <strong>${genericMedicine.generic_name}</strong>?</p>`;
+      body = `<p>Are you sure you want to delete generic medicine <strong>${genericMedicine.generic_name}</strong>?<br>
+              <small class="text-muted">This will be <b>permanently hidden</b> (soft deleted).</small></p>`;
     } else {
-      // add or edit form
       body = `
         <form id="genericMedicineForm" class="needs-validation" novalidate>
           <div id="formAlertContainer"></div>
@@ -112,18 +113,18 @@ class GenericMedicineManager {
     }
 
     const modalHtml = `
-      <div class="modal fade" id="genericMedicineModal" tabindex="-1" aria-labelledby="genericMedicineModalLabel" aria-hidden="true">
+      <div class="modal fade" id="genericMedicineModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
             <div class="modal-header ${mode === 'delete' ? 'bg-danger text-white' : 'bg-primary text-white'}">
-              <h5 class="modal-title" id="genericMedicineModalLabel">${title}</h5>
+              <h5 class="modal-title">${title}</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">${body}</div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-              ${(mode === 'add' || mode === 'edit') ? `<button type="button" class="btn btn-primary" id="saveGenericMedicineBtn">${mode === 'add' ? 'Add' : 'Update'}</button>` : ''}
-              ${mode === 'delete' ? `<button type="button" class="btn btn-danger" id="confirmDeleteGenericMedicineBtn">Delete</button>` : ''}
+              ${(mode === 'add' || mode === 'edit') ? `<button type="button" id="saveGenericMedicineBtn" class="btn btn-primary">${mode === 'add' ? 'Add' : 'Update'}</button>` : ''}
+              ${mode === 'delete' ? `<button type="button" id="confirmDeleteGenericMedicineBtn" class="btn btn-danger">Delete</button>` : ''}
             </div>
           </div>
         </div>
@@ -138,9 +139,8 @@ class GenericMedicineManager {
     modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
 
     if (mode === 'add' || mode === 'edit') {
-      const form = document.getElementById('genericMedicineForm');
-      form.classList.remove('was-validated');
       document.getElementById('saveGenericMedicineBtn').addEventListener('click', () => {
+        const form = document.getElementById('genericMedicineForm');
         if (!form.checkValidity()) {
           form.classList.add('was-validated');
           return;
@@ -160,15 +160,18 @@ class GenericMedicineManager {
     alertContainer.innerHTML = '';
 
     const genericName = form.querySelector('#genericName').value.trim();
-
     if (!genericName) {
       alertContainer.innerHTML = `<div class="alert alert-danger">Generic name is required.</div>`;
       return;
     }
 
-    let data = { generic_name: genericName };
+    const data = { generic_name: genericName };
     if (mode === 'edit') {
-      data.genericid = form.querySelector('#genericId').value;
+      data.genericid = parseInt(form.querySelector('#genericId').value, 10);
+      if (isNaN(data.genericid)) {
+        alertContainer.innerHTML = `<div class="alert alert-danger">Invalid generic ID.</div>`;
+        return;
+      }
     }
 
     const formData = new FormData();
@@ -177,12 +180,10 @@ class GenericMedicineManager {
 
     try {
       const res = await axios.post(this.baseApiUrl, formData);
-      if (res.data.error) throw new Error(res.data.error);
-      if (res.data.success === false) {
-        alertContainer.innerHTML = `<div class="alert alert-danger">${res.data.error}</div>`;
+      if (!res.data.success) {
+        alertContainer.innerHTML = `<div class="alert alert-danger">${res.data.error || 'Unknown error'}</div>`;
         return;
       }
-
       this.showAlert(`Generic medicine ${mode === 'edit' ? 'updated' : 'added'} successfully!`, 'success');
       modal.hide();
       await this.loadGenericMedicines();
@@ -192,16 +193,19 @@ class GenericMedicineManager {
   }
 
   async deleteGenericMedicine(genericid, modal) {
+    if (!genericid || isNaN(parseInt(genericid, 10))) {
+      this.showAlert('Invalid generic medicine ID for deletion.', 'danger');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('operation', 'deleteGenericMedicine');
     formData.append('genericid', genericid);
 
     try {
       const res = await axios.post(this.baseApiUrl, formData);
-      if (res.data.error) throw new Error(res.data.error);
-      if (res.data.success === false) throw new Error(res.data.error);
-
-      this.showAlert('Generic medicine deleted successfully!', 'success');
+      if (!res.data.success) throw new Error(res.data.error || 'Unknown error');
+      this.showAlert('Generic medicine has been permanently hidden (soft deleted).', 'success');
       modal.hide();
       await this.loadGenericMedicines();
     } catch (err) {
@@ -209,24 +213,17 @@ class GenericMedicineManager {
     }
   }
 
-  showAlert(message, type = 'info') {
+  showAlert(message, type='info') {
     document.querySelectorAll('.alert.position-fixed').forEach(el => el.remove());
-    const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle';
-
-    const alertHtml = `
+    const icon = type === 'success' ? 'check-circle' : (type === 'danger' ? 'exclamation-triangle' : 'info-circle');
+    const alertHTML = `
       <div class="alert alert-${type} alert-dismissible fade show position-fixed"
-           style="top: 20px; right: 20px; min-width: 350px; z-index: 1055;">
+           style="top:20px; right:20px; min-width:350px; z-index:1055;">
         <i class="bi bi-${icon} me-2"></i>${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>`;
-
-    document.body.insertAdjacentHTML('beforeend', alertHtml);
-
-    const alertEl = document.querySelector('.alert.position-fixed');
-    if (alertEl && window.bootstrap?.Alert) {
-      const bsAlert = new bootstrap.Alert(alertEl);
-      setTimeout(() => bsAlert.close(), 4000);
-    }
+    document.body.insertAdjacentHTML('beforeend', alertHTML);
+    setTimeout(() => document.querySelector('.alert.position-fixed')?.remove(), 4000);
   }
 }
 

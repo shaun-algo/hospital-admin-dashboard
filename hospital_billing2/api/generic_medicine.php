@@ -6,6 +6,8 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/error.log');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -27,114 +29,119 @@ class GenericMedicine {
         exit;
     }
 
+    private function logError($msg) {
+        error_log("[GenericMedicine API] " . $msg);
+    }
+
+    /** ✅ Get all non-deleted generics */
     public function getAllGenericMedicines() {
         try {
-            $stmt = $this->conn->prepare("SELECT genericid, generic_name FROM Generic_Medicine WHERE is_deleted = 0 ORDER BY generic_name");
+            $stmt = $this->conn->prepare("SELECT genericid, generic_name
+                                          FROM Generic_Medicine
+                                          WHERE is_deleted = 0
+                                          ORDER BY generic_name");
             $stmt->execute();
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $this->respond(["success" => true, "data" => $data]);
         } catch (Exception $e) {
-            $this->respond(["success" => false, "error" => "Failed to load generic medicines: " . $e->getMessage()], 500);
+            $this->logError($e->getMessage());
+            $this->respond(["success" => false, "error" => "Failed to get generics"], 500);
         }
     }
 
+    /** ✅ Insert new generic */
     public function insertGenericMedicine($data) {
         try {
             if (empty($data['generic_name']) || strlen(trim($data['generic_name'])) === 0) {
-                $this->respond(["success" => false, "error" => "Generic medicine name required"], 422);
+                $this->respond(["success" => false, "error" => "Generic name required"], 422);
             }
-
-            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM Generic_Medicine WHERE generic_name = :name AND is_deleted = 0");
-            $stmt->execute([':name' => trim($data['generic_name'])]);
+            $name = trim($data['generic_name']);
+            $stmt = $this->conn->prepare("SELECT COUNT(*)
+                                          FROM Generic_Medicine
+                                          WHERE generic_name = :name AND is_deleted = 0");
+            $stmt->execute([':name' => $name]);
             if ($stmt->fetchColumn() > 0) {
-                $this->respond(["success" => false, "error" => "Generic medicine with this name already exists"], 422);
+                $this->respond(["success" => false, "error" => "Generic medicine already exists"], 409);
             }
 
             $stmt = $this->conn->prepare("INSERT INTO Generic_Medicine (generic_name, is_deleted) VALUES (:name, 0)");
-            $stmt->execute([':name' => trim($data['generic_name'])]);
+            $stmt->execute([':name' => $name]);
 
             $this->respond(["success" => true, "id" => $this->conn->lastInsertId()], 201);
-        } catch (Exception $e) {
-            $this->respond(["success" => false, "error" => "Failed to insert generic medicine: " . $e->getMessage()], 500);
+        } catch (PDOException $e) {
+            $this->logError($e->getMessage());
+            $this->respond(["success" => false, "error" => "Insert failed"], 500);
         }
     }
 
+    /** ✅ Update existing generic */
     public function updateGenericMedicine($data) {
         try {
             if (empty($data['genericid']) || !filter_var($data['genericid'], FILTER_VALIDATE_INT)) {
-                $this->respond(["success" => false, "error" => "Missing or invalid generic medicine ID"], 422);
+                $this->respond(["success" => false, "error" => "Invalid genericid"], 422);
             }
             if (empty($data['generic_name']) || strlen(trim($data['generic_name'])) === 0) {
-                $this->respond(["success" => false, "error" => "Generic medicine name required"], 422);
+                $this->respond(["success" => false, "error" => "Generic name required"], 422);
             }
 
-            // Check exists
+            $id = (int)$data['genericid'];
+            $name = trim($data['generic_name']);
+
             $stmt = $this->conn->prepare("SELECT COUNT(*) FROM Generic_Medicine WHERE genericid = :id AND is_deleted = 0");
-            $stmt->execute([':id' => (int)$data['genericid']]);
-            if ($stmt->fetchColumn() == 0) {
+            $stmt->execute([':id' => $id]);
+            if ($stmt->fetchColumn() === 0) {
                 $this->respond(["success" => false, "error" => "Generic medicine not found"], 404);
             }
 
-            // Check unique name except this record
-            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM Generic_Medicine WHERE generic_name = :name AND genericid != :id AND is_deleted = 0");
-            $stmt->execute([
-                ':name' => trim($data['generic_name']),
-                ':id' => (int)$data['genericid']
-            ]);
+            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM Generic_Medicine
+                                          WHERE generic_name = :name AND genericid != :id AND is_deleted = 0");
+            $stmt->execute([':name' => $name, ':id' => $id]);
             if ($stmt->fetchColumn() > 0) {
-                $this->respond(["success" => false, "error" => "Another generic medicine with this name already exists"], 422);
+                $this->respond(["success" => false, "error" => "Another generic medicine with this name exists"], 409);
             }
 
             $stmt = $this->conn->prepare("UPDATE Generic_Medicine SET generic_name = :name WHERE genericid = :id");
-            $stmt->execute([
-                ':name' => trim($data['generic_name']),
-                ':id' => (int)$data['genericid']
-            ]);
+            $stmt->execute([':name' => $name, ':id' => $id]);
 
             $this->respond(["success" => true]);
-        } catch (Exception $e) {
-            $this->respond(["success" => false, "error" => "Failed to update generic medicine: " . $e->getMessage()], 500);
+        } catch (PDOException $e) {
+            $this->logError($e->getMessage());
+            $this->respond(["success" => false, "error" => "Update failed"], 500);
         }
     }
 
+    /** ✅ Soft delete */
     public function deleteGenericMedicine($genericid) {
         try {
             if (empty($genericid) || !filter_var($genericid, FILTER_VALIDATE_INT)) {
-                $this->respond(["success" => false, "error" => "Missing or invalid generic medicine ID"], 422);
+                $this->respond(["success" => false, "error" => "Invalid genericid"], 422);
             }
 
-            // Check if referenced by medicines
-            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM Medicine WHERE genericid = :id AND is_deleted = 0");
-            $stmt->execute([':id' => (int)$genericid]);
-            if ($stmt->fetchColumn() > 0) {
-                $this->respond(["success" => false, "error" => "Cannot delete generic medicine referenced by medicines"], 422);
-            }
-
+            // Always soft delete, even if referenced
             $stmt = $this->conn->prepare("UPDATE Generic_Medicine SET is_deleted = 1 WHERE genericid = :id");
             $stmt->execute([':id' => (int)$genericid]);
 
-            $this->respond(["success" => true, "message" => "Generic medicine deleted (soft)"]);
-        } catch (Exception $e) {
-            $this->respond(["success" => false, "error" => "Failed to delete generic medicine: " . $e->getMessage()], 500);
+            $this->respond(["success" => true, "message" => "Generic medicine soft-deleted"]);
+        } catch (PDOException $e) {
+            $this->logError($e->getMessage());
+            $this->respond(["success" => false, "error" => "Delete failed"], 500);
         }
     }
 }
 
-
-// Router and request handling
 $operation = $_REQUEST['operation'] ?? null;
 if (!$operation) {
     http_response_code(400);
-    echo json_encode(["success" => false, "error" => "Missing operation parameter"]);
+    echo json_encode(["success" => false, "error" => "Missing operation"]);
     exit;
 }
 
-$rawInput = file_get_contents("php://input");
-$jsonData = $_SERVER['REQUEST_METHOD'] === 'POST' ? json_decode($rawInput, true) : null;
+$jsonRaw = $_POST['json'] ?? '';
+$jsonData = !empty($jsonRaw) ? json_decode($jsonRaw, true) : null;
 
-if (json_last_error() !== JSON_ERROR_NONE && $operation !== 'getAllGenericMedicines') {
+if ($jsonRaw !== '' && json_last_error() !== JSON_ERROR_NONE && $operation !== 'getAllGenericMedicines') {
     http_response_code(400);
-    echo json_encode(["success" => false, "error" => "Invalid JSON input: " . json_last_error_msg()]);
+    echo json_encode(["success" => false, "error" => "Invalid JSON: " . json_last_error_msg()]);
     exit;
 }
 
@@ -170,3 +177,4 @@ switch ($operation) {
         echo json_encode(["success" => false, "error" => "Invalid operation"]);
         break;
 }
+?>

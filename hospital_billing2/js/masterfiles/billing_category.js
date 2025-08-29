@@ -21,7 +21,7 @@ class BillingCategoryManager {
       const action = btn.getAttribute('data-action');
       if (!id || !action) return;
 
-      const category = this.categories.find(c => c.billing_categoryid == id);
+      const category = this.categories.find(c => String(c.billing_categoryid) === String(id));
       if (!category) return;
 
       this.openModal(action, category);
@@ -44,6 +44,8 @@ class BillingCategoryManager {
 
   async loadCategories() {
     const tbody = document.getElementById('categoryTableBody');
+    if (!tbody) return;
+
     tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4">
       <div class="spinner-border text-primary" role="status"></div>
       <p class="mt-2">Loading categories...</p>
@@ -61,18 +63,20 @@ class BillingCategoryManager {
 
   renderTable() {
     const tbody = document.getElementById('categoryTableBody');
+    if (!tbody) return;
+
     if (this.categories.length === 0) {
       tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted">No categories found.</td></tr>`;
       return;
     }
-    tbody.innerHTML = this.categories.map(c => `
+    tbody.innerHTML = this.categories.map(category => `
       <tr>
-        <td><strong>${c.name}</strong></td>
+        <td><strong>${this.escape(category.name)}</strong></td>
         <td>
-        <div style="display: flex; flex-direction: row; gap: 8px; flex-wrap: nowrap;">
-          <button class="btn btn-sm btn-info me-1" style="flex-shrink: 0;" data-id="${c.billing_categoryid}" data-action="view" title="View Category"><i class="bi bi-eye"></i></button>
-          <button class="btn btn-sm btn-warning me-1" style="flex-shrink: 0;" data-id="${c.billing_categoryid}" data-action="edit" title="Edit Category"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-sm btn-danger" style="flex-shrink: 0;" data-id="${c.billing_categoryid}" data-action="delete" title="Delete Category"><i class="bi bi-trash"></i></button>
+          <div style="display: flex; flex-direction: row; gap: 8px; flex-wrap: nowrap;">
+            <button class="btn btn-sm btn-info me-1" style="flex-shrink: 0;" data-id="${category.billing_categoryid}" data-action="view" title="View Category"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-warning me-1" style="flex-shrink: 0;" data-id="${category.billing_categoryid}" data-action="edit" title="Edit Category"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-danger" style="flex-shrink: 0;" data-id="${category.billing_categoryid}" data-action="delete" title="Delete Category"><i class="bi bi-trash"></i></button>
           </div>
         </td>
       </tr>
@@ -80,7 +84,7 @@ class BillingCategoryManager {
   }
 
   openModal(mode, category = null) {
-    // Remove existing modal if any
+    // Remove existing modal
     const existingModal = document.getElementById('categoryModal');
     if (existingModal) existingModal.remove();
 
@@ -89,13 +93,10 @@ class BillingCategoryManager {
 
     if (mode === 'view') {
       title = 'View Billing Category';
-      body = `
-
-        <p><strong>Name:</strong> ${category.name}</p>
-      `;
+      body = `<p><strong>Name:</strong> ${this.escape(category.name)}</p>`;
     } else if (mode === 'delete') {
       title = 'Confirm Delete Category';
-      body = `<p>Are you sure you want to delete category <strong>${category.name}</strong>?</p>`;
+      body = `<p>Are you sure you want to delete category <strong>${this.escape(category.name)}</strong>?</p>`;
     } else {
       title = mode === 'add' ? 'Add New Category' : 'Edit Category';
       body = `
@@ -103,7 +104,7 @@ class BillingCategoryManager {
           <input type="hidden" id="categoryId" value="${category ? category.billing_categoryid : ''}" />
           <div class="mb-3">
             <label for="categoryName" class="form-label">Category Name</label>
-            <input type="text" id="categoryName" class="form-control" value="${category ? category.name : ''}" required />
+            <input type="text" id="categoryName" class="form-control" value="${category ? this.escape(category.name) : ''}" required />
             <div class="invalid-feedback">Category name is required.</div>
           </div>
         </form>
@@ -155,7 +156,7 @@ class BillingCategoryManager {
 
     const data = {
       billing_categoryid: form.querySelector('#categoryId').value || null,
-      name: form.querySelector('#categoryName').value.trim()
+      name: form.querySelector('#categoryName').value.trim() // name aligned with API field
     };
 
     try {
@@ -164,14 +165,14 @@ class BillingCategoryManager {
         json: data
       });
       if (res.data.success === false) {
-        alert(res.data.error);
+        this.showAlert(res.data.error, 'danger');
         return;
       }
       this.showAlert(`Category ${mode === 'edit' ? 'updated' : 'added'} successfully!`, 'success');
       modal.hide();
       this.loadCategories();
     } catch (err) {
-      alert(`Failed to ${mode === 'edit' ? 'update' : 'add'} category: ${err.message}`);
+      this.showAlert(`Failed to ${mode === 'edit' ? 'update' : 'add'} category: ${err.message}`, 'danger');
     }
   }
 
@@ -207,6 +208,15 @@ class BillingCategoryManager {
       const bsAlert = new bootstrap.Alert(alertEl);
       setTimeout(() => bsAlert.close(), 3000);
     }
+  }
+
+  escape(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 

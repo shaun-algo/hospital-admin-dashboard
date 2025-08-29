@@ -6,6 +6,8 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/error.log');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -45,6 +47,7 @@ class Medicine {
         return true;
     }
 
+    /** ✅ Get all non-deleted medicines */
     public function getAllMedicines() {
         try {
             $stmt = $this->conn->prepare(
@@ -62,6 +65,7 @@ class Medicine {
         }
     }
 
+    /** ✅ Insert medicine */
     public function insertMedicine($data) {
         try {
             $validation = $this->validateMedicineData($data);
@@ -69,7 +73,10 @@ class Medicine {
                 $this->respond(["success" => false, "error" => $validation], 422);
             }
 
-            $stmt = $this->conn->prepare("INSERT INTO Medicine (brand_name, genericid, description, price, is_deleted) VALUES (:brand_name, :genericid, :description, :price, 0)");
+            $stmt = $this->conn->prepare(
+                "INSERT INTO Medicine (brand_name, genericid, description, price, is_deleted)
+                 VALUES (:brand_name, :genericid, :description, :price, 0)"
+            );
             $stmt->execute([
                 ':brand_name' => trim($data['brand_name']),
                 ':genericid' => (int)$data['genericid'],
@@ -83,6 +90,7 @@ class Medicine {
         }
     }
 
+    /** ✅ Update medicine */
     public function updateMedicine($data) {
         try {
             $validation = $this->validateMedicineData($data, true);
@@ -90,7 +98,11 @@ class Medicine {
                 $this->respond(["success" => false, "error" => $validation], 422);
             }
 
-            $stmt = $this->conn->prepare("UPDATE Medicine SET brand_name = :brand_name, genericid = :genericid, description = :description, price = :price WHERE medicineid = :medicineid");
+            $stmt = $this->conn->prepare(
+                "UPDATE Medicine
+                 SET brand_name = :brand_name, genericid = :genericid, description = :description, price = :price
+                 WHERE medicineid = :medicineid AND is_deleted = 0"
+            );
             $stmt->execute([
                 ':medicineid' => (int)$data['medicineid'],
                 ':brand_name' => trim($data['brand_name']),
@@ -99,12 +111,17 @@ class Medicine {
                 ':price' => (float)$data['price'],
             ]);
 
+            if ($stmt->rowCount() === 0) {
+                $this->respond(["success" => false, "error" => "Medicine not found or already deleted"], 404);
+            }
+
             $this->respond(["success" => true]);
         } catch (Exception $e) {
             $this->respond(["success" => false, "error" => "Failed to update medicine: " . $e->getMessage()], 500);
         }
     }
 
+    /** ✅ Soft delete medicine */
     public function deleteMedicine($medicineid) {
         try {
             if (empty($medicineid) || !filter_var($medicineid, FILTER_VALIDATE_INT)) {
@@ -114,13 +131,18 @@ class Medicine {
             $stmt = $this->conn->prepare("UPDATE Medicine SET is_deleted = 1 WHERE medicineid = :medicineid");
             $stmt->execute([':medicineid' => (int)$medicineid]);
 
-            $this->respond(["success" => true]);
+            if ($stmt->rowCount() === 0) {
+                $this->respond(["success" => false, "error" => "Medicine not found or already deleted"], 404);
+            }
+
+            $this->respond(["success" => true, "message" => "Medicine soft-deleted"]);
         } catch (Exception $e) {
             $this->respond(["success" => false, "error" => "Failed to delete medicine: " . $e->getMessage()], 500);
         }
     }
 }
 
+// -------------------- ROUTER --------------------
 $operation = $_REQUEST['operation'] ?? null;
 if (!$operation) {
     http_response_code(400);
@@ -128,12 +150,12 @@ if (!$operation) {
     exit;
 }
 
-$rawInput = file_get_contents("php://input");
-$jsonData = $_SERVER['REQUEST_METHOD'] === 'POST' ? json_decode($rawInput, true) : null;
+$jsonRaw = $_POST['json'] ?? '';
+$jsonData = !empty($jsonRaw) ? json_decode($jsonRaw, true) : null;
 
-if (json_last_error() !== JSON_ERROR_NONE && $operation !== 'getAllMedicines') {
+if ($jsonRaw !== '' && json_last_error() !== JSON_ERROR_NONE && $operation !== 'getAllMedicines') {
     http_response_code(400);
-    echo json_encode(["success" => false, "error" => "Invalid JSON input: " . json_last_error_msg()]);
+    echo json_encode(["success" => false, "error" => "Invalid JSON: " . json_last_error_msg()]);
     exit;
 }
 
@@ -169,3 +191,4 @@ switch ($operation) {
         echo json_encode(["success" => false, "error" => "Invalid operation"]);
         exit;
 }
+?>

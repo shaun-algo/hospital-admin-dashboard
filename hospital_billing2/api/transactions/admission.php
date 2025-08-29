@@ -4,18 +4,18 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
 
+include_once __DIR__ . '/../connection.php';
+
 class AdmissionAPI {
-    private function connect() {
-        include __DIR__ . "/../connection.php";
-        return (new Database())->connect();
+    private $conn;
+
+    public function __construct() {
+        $this->conn = (new Database())->connect();
     }
 
     private function respond($data, $status = 200) {
@@ -24,101 +24,111 @@ class AdmissionAPI {
         exit;
     }
 
-    function getAllAdmissions() {
+    private function checkExists($table, $column, $value) {
+        $stmt = $this->conn->prepare("SELECT 1 FROM {$table} WHERE {$column} = :value LIMIT 1");
+        $stmt->execute([':value' => $value]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    public function getAllAdmissions() {
         try {
-            $conn = $this->connect();
-            $stmt = $conn->query("
-                SELECT a.admissionid, a.patientid, a.doctorid, a.admission_date, a.status,
+            $stmt = $this->conn->query("
+                SELECT a.admissionid, a.patientid, a.doctorid, a.userid, a.admission_date, a.status,
                        p.fullname AS patient_name,
-                       d.fullname AS doctor_name
-                FROM Admission a
-                JOIN Patient p ON a.patientid = p.patientid
+                       d.fullname AS doctor_name,
                        u.username AS user_name
+                FROM Admission a
+                LEFT JOIN Patient p ON a.patientid = p.patientid
+                LEFT JOIN Doctor d ON a.doctorid = d.doctorid
+                LEFT JOIN User u ON a.userid = u.userid
                 ORDER BY a.admissionid DESC
             ");
-            $this->respond($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
-                JOIN User u ON a.userid = u.userid
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $this->respond($results);
+        } catch (Exception $e) {
             $this->respond(["error" => $e->getMessage()], 500);
         }
     }
 
-    function insertAdmission($data) {
+    public function insertAdmission($data) {
         try {
-            $data = is_array($data) ? $data : json_decode($data, true);
-            if (empty($data['patientid'], $data['doctorid'], $data['admission_date'], $data['status'])) {
+            if (empty($data['patientid']) || empty($data['doctorid']) || empty($data['userid']) || empty($data['admission_date']) || empty($data['status'])) {
                 $this->respond(["success" => false, "error" => "Missing required fields"], 422);
             }
 
-            $conn = $this->connect();
-
-            $stmt = $conn->prepare("SELECT patientid FROM Patient WHERE patientid = :id");
-            $stmt->execute([':id' => $data['patientid']]);
-            if (!$stmt->fetch()) {
+            if (!$this->checkExists('Patient', 'patientid', $data['patientid'])) {
                 $this->respond(["success" => false, "error" => "Invalid patient ID"], 422);
             }
-
-                SELECT a.admissionid, a.patientid, a.userid, a.admission_date, a.status,
-            $stmt->execute([':id' => $data['doctorid']]);
-            if (!$stmt->fetch()) {
-                       u.username AS user_name
+            if (!$this->checkExists('Doctor', 'doctorid', $data['doctorid'])) {
+                $this->respond(["success" => false, "error" => "Invalid doctor ID"], 422);
+            }
+            if (!$this->checkExists('User', 'userid', $data['userid'])) {
+                $this->respond(["success" => false, "error" => "Invalid user ID"], 422);
             }
 
-            $stmt = $conn->prepare("
-                JOIN User u ON a.userid = u.userid
-                VALUES (:patientid, :doctorid, :admission_date, :status)
+            // Prevent duplicate admission for currently admitted patient
+            $checkStmt = $this->conn->prepare("
+                SELECT 1 FROM Admission
+                WHERE patientid = :patientid AND status NOT IN ('Discharged', 'Closed')
+                LIMIT 1
+            ");
+            $checkStmt->execute([':patientid' => $data['patientid']]);
+            if ($checkStmt->fetchColumn()) {
+                $this->respond(["success" => false, "error" => "Patient is already admitted"], 422);
+            }
+
+            $stmt = $this->conn->prepare("
+                INSERT INTO Admission (patientid, doctorid, userid, admission_date, status)
+                VALUES (:patientid, :doctorid, :userid, :admission_date, :status)
             ");
             $stmt->execute([
                 ':patientid' => $data['patientid'],
                 ':doctorid' => $data['doctorid'],
+                ':userid' => $data['userid'],
                 ':admission_date' => $data['admission_date'],
                 ':status' => $data['status']
             ]);
 
-            $this->respond(["success" => true, "admissionid" => $conn->lastInsertId()], 201);
+            $this->respond(["success" => true, "admissionid" => $this->conn->lastInsertId()], 201);
         } catch (Exception $e) {
             $this->respond(["success" => false, "error" => $e->getMessage()], 500);
         }
     }
-            $userid = $data['userid'] ?? null;
-    function updateAdmission($data) {
+
+    public function updateAdmission($data) {
         try {
-            $data = is_array($data) ? $data : json_decode($data, true);
-            if (empty($patientid) || empty($userid) || empty($admission_date) || empty($status)) {
+            if (empty($data['admissionid']) || empty($data['patientid']) || empty($data['doctorid']) || empty($data['userid']) || empty($data['admission_date']) || empty($data['status'])) {
                 $this->respond(["success" => false, "error" => "Missing required fields"], 422);
             }
 
-            $conn = $this->connect();
-
-            $stmt = $conn->prepare("SELECT admissionid FROM Admission WHERE admissionid = :id");
-            $stmt->execute([':id' => $data['admissionid']]);
-            if (!$stmt->fetch()) {
-                $this->respond(["success" => false, "error" => "Admission not found"], 404);
+            if (!$this->checkExists('Patient', 'patientid', $data['patientid'])) {
+                $this->respond(["success" => false, "error" => "Invalid patient ID"], 422);
+            }
+            if (!$this->checkExists('Doctor', 'doctorid', $data['doctorid'])) {
+                $this->respond(["success" => false, "error" => "Invalid doctor ID"], 422);
+            }
+            if (!$this->checkExists('User', 'userid', $data['userid'])) {
+                $this->respond(["success" => false, "error" => "Invalid user ID"], 422);
             }
 
-            $stmt = $conn->prepare("SELECT patientid FROM Patient WHERE patientid = :id");
-            $stmt->execute([':id' => $data['patientid']]);
-            // Check if user exists
-            $stmt = $conn->prepare("SELECT userid FROM User WHERE userid = :userid");
-            $stmt->execute([":userid" => $userid]);
-
-                $this->respond(["success" => false, "error" => "Invalid user ID"], 422);
-            $stmt->execute([':id' => $data['doctorid']]);
-            if (!$stmt->fetch()) {
-                $this->respond(["success" => false, "error" => "Invalid doctor ID"], 422);
-                INSERT INTO Admission (patientid, userid, admission_date, status)
-                VALUES (:patientid, :userid, :admission_date, :status)
-            $stmt = $conn->prepare("
+            $stmt = $this->conn->prepare("
                 UPDATE Admission
-                SET patientid = :patientid, doctorid = :doctorid, admission_date = :admission_date, status = :status
-                ":userid" => $userid,
+                SET patientid = :patientid, doctorid = :doctorid, userid = :userid,
+                    admission_date = :admission_date, status = :status
+                WHERE admissionid = :admissionid
             ");
             $stmt->execute([
+                ':admissionid' => $data['admissionid'],
                 ':patientid' => $data['patientid'],
                 ':doctorid' => $data['doctorid'],
+                ':userid' => $data['userid'],
                 ':admission_date' => $data['admission_date'],
-                ':status' => $data['status'],
-                ':admissionid' => $data['admissionid']
+                ':status' => $data['status']
             ]);
+
+            if ($stmt->rowCount() === 0) {
+                $this->respond(["success" => false, "error" => "Admission not found"], 404);
+            }
 
             $this->respond(["success" => true]);
         } catch (Exception $e) {
@@ -126,20 +136,14 @@ class AdmissionAPI {
         }
     }
 
-    function deleteAdmission($id) {
+    public function deleteAdmission($admissionid) {
         try {
-            $userid = $data['userid'] ?? null;
+            $stmt = $this->conn->prepare("DELETE FROM Admission WHERE admissionid = :id");
+            $stmt->execute([':id' => $admissionid]);
 
-            $conn = $this->connect();
-
-            if (empty($admissionid) || empty($patientid) || empty($userid) || empty($admission_date) || empty($status)) {
-            $stmt->execute([':id' => $id]);
-            if (!$stmt->fetch()) {
+            if ($stmt->rowCount() === 0) {
                 $this->respond(["success" => false, "error" => "Admission not found"], 404);
             }
-
-            $stmt = $conn->prepare("DELETE FROM Admission WHERE admissionid = :id");
-            $stmt->execute([':id' => $id]);
 
             $this->respond(["success" => true, "message" => "Admission deleted"]);
         } catch (Exception $e) {
@@ -148,31 +152,26 @@ class AdmissionAPI {
     }
 }
 
-
+$api = new AdmissionAPI();
 $input = json_decode(file_get_contents("php://input"), true) ?? [];
 $params = array_merge($_GET, $_POST, $input);
 
-$operation = $params['operation'] ?? '';
-            // Check if user exists
-            $stmt = $conn->prepare("SELECT userid FROM User WHERE userid = :userid");
-            $stmt->execute([":userid" => $userid]);
-$api = new AdmissionAPI();
-                $this->respond(["success" => false, "error" => "Invalid user ID"], 422);
+$operation = $params['operation'] ?? null;
+
 switch ($operation) {
     case 'getAllAdmissions':
         $api->getAllAdmissions();
         break;
-                SET patientid = :patientid, userid = :userid, admission_date = :admission_date, status = :status
-        $api->insertAdmission($jsonData);
+    case 'insertAdmission':
+        $api->insertAdmission($input);
         break;
     case 'updateAdmission':
-        $api->updateAdmission($jsonData);
-                ":userid" => $userid,
+        $api->updateAdmission($input);
+        break;
     case 'deleteAdmission':
-        $api->deleteAdmission($admissionid);
+        $api->deleteAdmission($params['admissionid'] ?? null);
         break;
     default:
         http_response_code(400);
         echo json_encode(["error" => "Invalid operation"]);
 }
-?>
