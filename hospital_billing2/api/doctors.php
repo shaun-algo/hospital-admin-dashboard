@@ -1,168 +1,83 @@
 <?php
-header('Content-Type: application/json');
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS'){ http_response_code(204); exit; }
+require_once __DIR__ . '/connection.php';
+error_reporting(E_ALL); ini_set('display_errors', 0);
 
 class Doctor {
-    private function connect() {
-        include "connection.php";
-        return (new Database())->connect();
+    private PDO $conn;
+    public function __construct(){ $this->conn = (new Database())->connect(); $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); }
+
+    public function getAllDoctors(){
+        $stmt = $this->conn->prepare("
+            SELECT d.doctorid, d.fullname, d.specialtyid,
+                   s.name AS specialty_name,
+                   s.name AS specialty,
+                   d.contact_no, d.status
+            FROM Doctor d
+            LEFT JOIN Specialty s ON d.specialtyid = s.specialtyid
+            WHERE d.deleted_at IS NULL
+            ORDER BY d.fullname
+        ");
+        $stmt->execute();
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
-    // Fetch all doctors
-    function getAllDoctors() {
-        try {
-            $conn = $this->connect();
-            $stmt = $conn->prepare("
-                SELECT d.doctorid, d.fullname, d.specialtyid, s.name as specialty_name, d.contact_no, d.status
-                FROM Doctor d
-                LEFT JOIN Specialty s ON d.specialtyid = s.specialtyid
-                ORDER BY d.fullname
-            ");
-            $stmt->execute();
-            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            echo json_encode($result);
-            return;
-        } catch (Exception $e) {
-            echo json_encode(["error" => $e->getMessage()]);
-            return;
-        }
+    public function getDoctorById($id){
+        if (empty($id)){ echo json_encode(['error'=>'Doctor id required']); return; }
+        $stmt = $this->conn->prepare("
+            SELECT d.doctorid, d.fullname, d.specialtyid,
+                   s.name AS specialty_name,
+                   s.name AS specialty,
+                   d.contact_no, d.status
+            FROM Doctor d
+            LEFT JOIN Specialty s ON d.specialtyid = s.specialtyid
+            WHERE d.doctorid = :id AND d.deleted_at IS NULL
+            LIMIT 1
+        ");
+        $stmt->execute([':id'=>$id]);
+        echo json_encode($stmt->fetch(PDO::FETCH_ASSOC) ?: []);
     }
 
-    // Fetch single doctor by ID
-    function getDoctorById($id) {
-        try {
-            if (empty($id)) {
-                echo json_encode(["error" => "Doctor ID is required"]);
-                return;
-            }
-            $conn = $this->connect();
-            $stmt = $conn->prepare("
-                SELECT d.doctorid, d.fullname, d.specialtyid, s.name as specialty_name, d.contact_no, d.status
-                FROM Doctor d
-                LEFT JOIN Specialty s ON d.specialtyid = s.specialtyid
-                WHERE d.doctorid = :id LIMIT 1
-            ");
-            $stmt->bindParam(":id", $id, PDO::PARAM_INT);
-            $stmt->execute();
-            echo json_encode($stmt->fetch(PDO::FETCH_ASSOC) ?: []);
-            return;
-        } catch (Exception $e) {
-            echo json_encode(["error" => $e->getMessage()]);
-            return;
-        }
+    public function insertDoctor($data){
+        if (empty($data['fullname']) || !isset($data['specialtyid']) || !isset($data['contact_no']) || !isset($data['status'])) { echo json_encode(['success'=>false,'error'=>'Missing fields']); return; }
+        $stmt = $this->conn->prepare("INSERT INTO Doctor (fullname, specialtyid, contact_no, status) VALUES (:fullname,:specialtyid,:contact_no,:status)");
+        $stmt->execute([':fullname'=>$data['fullname'],':specialtyid'=>$data['specialtyid'],':contact_no'=>$data['contact_no'],':status'=>$data['status']]);
+        echo json_encode(['success'=>true,'doctorid'=>$this->conn->lastInsertId()]);
     }
 
-    // Insert new doctor
-    function insertDoctor($data) {
-        try {
-            if (empty($data['fullname']) || empty($data['specialtyid']) || empty($data['contact_no']) || empty($data['status'])) {
-                echo json_encode(["success" => false, "error" => "Missing required fields"]);
-                return;
-            }
-            $conn = $this->connect();
-            $stmt = $conn->prepare("
-                INSERT INTO Doctor (fullname, specialtyid, contact_no, status)
-                VALUES (:fullname, :specialtyid, :contact_no, :status)
-            ");
-            $stmt->execute([
-                ":fullname"    => $data['fullname'],
-                ":specialtyid" => $data['specialtyid'],
-                ":contact_no"  => $data['contact_no'],
-                ":status"      => $data['status']
-            ]);
-            echo json_encode(["success" => true, "doctorid" => $conn->lastInsertId()]);
-            return;
-        } catch (Exception $e) {
-            echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            return;
-        }
+    public function updateDoctor($data){
+        if (empty($data['doctorid']) || empty($data['fullname']) || !isset($data['specialtyid']) || !isset($data['contact_no']) || !isset($data['status'])) { echo json_encode(['success'=>false,'error'=>'Missing fields']); return; }
+        $stmt = $this->conn->prepare("UPDATE Doctor SET fullname=:fullname, specialtyid=:specialtyid, contact_no=:contact_no, status=:status WHERE doctorid=:doctorid AND deleted_at IS NULL");
+        $stmt->execute([':fullname'=>$data['fullname'],':specialtyid'=>$data['specialtyid'],':contact_no'=>$data['contact_no'],':status'=>$data['status'],':doctorid'=>$data['doctorid']]);
+        echo json_encode(['success'=>true]);
     }
 
-    // Update doctor
-    function updateDoctor($data) {
-        try {
-            if (empty($data['doctorid']) || empty($data['fullname']) || empty($data['specialtyid']) || empty($data['contact_no']) || empty($data['status'])) {
-                echo json_encode(["success" => false, "error" => "Missing required fields"]);
-                return;
-            }
-            $conn = $this->connect();
-            $stmt = $conn->prepare("
-                UPDATE Doctor
-                SET fullname=:fullname, specialtyid=:specialtyid, contact_no=:contact_no, status=:status
-                WHERE doctorid=:doctorid
-            ");
-            $stmt->execute([
-                ":fullname"    => $data['fullname'],
-                ":specialtyid" => $data['specialtyid'],
-                ":contact_no"  => $data['contact_no'],
-                ":status"      => $data['status'],
-                ":doctorid"    => $data['doctorid']
-            ]);
-            echo json_encode(["success" => true]);
-            return;
-        } catch (Exception $e) {
-            echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            return;
-        }
-    }
-
-    // Delete doctor
-    function deleteDoctor($id) {
-        try {
-            if (empty($id)) {
-                echo json_encode(["success" => false, "error" => "Doctor ID is required"]);
-                return;
-            }
-            $conn = $this->connect();
-            $stmt = $conn->prepare("DELETE FROM Doctor WHERE doctorid = :id");
-            $stmt->bindParam(":id", $id, PDO::PARAM_INT);
-            $stmt->execute();
-            echo json_encode(["success" => true]);
-            return;
-        } catch (Exception $e) {
-            echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            return;
-        }
+    public function deleteDoctor($id){
+        if (empty($id)){ echo json_encode(['success'=>false,'error'=>'Doctor id required']); return; }
+        // soft delete
+        $stmt = $this->conn->prepare("UPDATE Doctor SET deleted_at = NOW() WHERE doctorid = :id AND deleted_at IS NULL");
+        $stmt->execute([':id'=>$id]);
+        if ($stmt->rowCount() === 0) echo json_encode(['success'=>false,'error'=>'Doctor not found or already deleted']);
+        else echo json_encode(['success'=>true,'message'=>'Doctor soft-deleted']);
     }
 }
 
-// ===== REQUEST HANDLING =====
-$input = json_decode(file_get_contents("php://input"), true) ?? [];
+// router
+$input = json_decode(file_get_contents('php://input'), true) ?? [];
 $params = array_merge($_GET, $_POST, $input);
+$op = $params['operation'] ?? null;
+$api = new Doctor();
 
-$operation = $params['operation'] ?? '';
-$doctorid  = $params['doctorid'] ?? '';
-$jsonData  = $params;
-
-// Handle operations
-$doctor = new Doctor();
-switch ($operation) {
-    case "getAllDoctors":
-        $doctor->getAllDoctors();
-        break;
-    case "getDoctorById":
-        $doctor->getDoctorById($doctorid);
-        break;
-    case "insertDoctor":
-        $doctor->insertDoctor($jsonData);
-        break;
-    case "updateDoctor":
-        $doctor->updateDoctor($jsonData);
-        break;
-    case "deleteDoctor":
-        $doctor->deleteDoctor($doctorid);
-        break;
-    default:
-        echo json_encode(["error" => "Invalid operation: {$operation}"]);
+switch($op){
+    case 'getAllDoctors': $api->getAllDoctors(); break;
+    case 'getDoctorById': $api->getDoctorById($params['doctorid'] ?? null); break;
+    case 'insertDoctor': $api->insertDoctor($params); break;
+    case 'updateDoctor': $api->updateDoctor($params); break;
+    case 'deleteDoctor': $api->deleteDoctor($params['doctorid'] ?? null); break;
+    default: echo json_encode(['error'=>'Invalid operation']);
 }
-?>

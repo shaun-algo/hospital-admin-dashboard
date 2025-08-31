@@ -1,0 +1,30 @@
+<!-- Prescriptions Card -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">Prescriptions</h5>
+    <button class="btn btn-primary" id="addPrescriptionBtn">
+      <i class="bi bi-plus-lg me-1"></i> Add Prescription
+    </button>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Patient</th>
+            <th>Medicine</th>
+            <th>Quantity</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th style="width:140px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="prescriptionTableBody">
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">Loading…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

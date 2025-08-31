@@ -176,6 +176,12 @@ class LabRequestManager {
       return `<option value="${test.testid}" ${selected}>${test.name} (${test.category_name})</option>`;
     }).join('');
 
+    // Only show status select for edit and view modes
+    const statusOptions = ['Pending', 'In Progress', 'Completed', 'Cancelled'].map(status => {
+      const selected = labRequest && labRequest.status === status ? 'selected' : '';
+      return `<option value="${status}" ${selected}>${status}</option>`;
+    }).join('');
+
     const modalBody = `
       <form id="labRequestForm" class="needs-validation" novalidate>
         <input type="hidden" id="labRequestId" value="${labRequest ? labRequest.lab_requestid : ''}">
@@ -189,6 +195,7 @@ class LabRequestManager {
             </select>
             <div class="invalid-feedback">Please select an admission.</div>
           </div>
+
           <div class="col-md-6">
             <label for="doctorSelect" class="form-label">Requested By</label>
             <select class="form-select" id="doctorSelect" ${mode === 'view' || mode === 'delete' ? 'disabled' : ''} required>
@@ -208,6 +215,15 @@ class LabRequestManager {
             </select>
             <div class="invalid-feedback">Please select a lab test.</div>
           </div>
+
+          ${mode !== 'add' ? `<div class="col-md-6">
+            <label for="statusSelect" class="form-label">Status</label>
+            <select class="form-select" id="statusSelect" ${mode === 'view' || mode === 'delete' ? 'disabled' : ''} required>
+              <option value="">-- Select Status --</option>
+              ${statusOptions}
+            </select>
+            <div class="invalid-feedback">Please select status.</div>
+          </div>` : ''}
         </div>
 
         ${mode === 'delete' ? `
@@ -220,15 +236,15 @@ class LabRequestManager {
     `;
 
     const modalHtml = `
-      <div class="modal fade" id="labRequestModal" tabindex="-1">
+      <div class="modal fade" id="labRequestModal" tabindex="-1" aria-labelledby="labRequestModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title">
+              <h5 class="modal-title" id="labRequestModalLabel">
                 <i class="bi bi-${mode === 'edit' ? 'pencil-square' : mode === 'view' ? 'eye' : mode === 'delete' ? 'trash' : 'plus-circle'} me-2"></i>
                 ${mode === 'edit' ? 'Edit' : mode === 'view' ? 'View' : mode === 'delete' ? 'Delete' : 'Add'} Lab Request
               </h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">${modalBody}</div>
             <div class="modal-footer">
@@ -271,7 +287,7 @@ class LabRequestManager {
       admissionid: document.getElementById('admissionSelect').value,
       requestedBy: document.getElementById('doctorSelect').value,
       testid: document.getElementById('testSelect').value,
-      status: mode === 'add' ? 'Pending' : undefined
+      status: mode === 'add' ? 'Pending' : document.getElementById('statusSelect').value
     };
 
     try {

@@ -269,25 +269,26 @@ class RoomManager {
     }
   }
 
-  async deleteRoom(room_no, modal) {
-    const formData = new FormData();
-    formData.append('operation', 'deleteRoom');
-    formData.append('roomid', room_no);
+ async deleteRoom(room_no, modal) {
+  const formData = new FormData();
+  formData.append('operation', 'deleteRoom');
+  formData.append('room_no', room_no); // ✅ FIXED (was roomid)
 
-    try {
-      const res = await axios.post(this.baseApiUrl, formData);
+  try {
+    const res = await axios.post(this.baseApiUrl, formData);
 
-      if (res.data.error) throw new Error(res.data.error);
-      if (res.data.success === false) throw new Error(res.data.error);
+    if (res.data.error) throw new Error(res.data.error);
+    if (res.data.success === false) throw new Error(res.data.error);
 
-      this.showAlert('Room deleted successfully!', 'success');
-      modal.hide();
-      this.loadRooms();
-    } catch (err) {
-      console.error('Error deleting room:', err);
-      this.showAlert('Failed to delete room. Please try again.', 'danger');
-    }
+    this.showAlert('Room deleted successfully!', 'success');
+    modal.hide();
+    this.loadRooms();
+  } catch (err) {
+    console.error('Error deleting room:', err);
+    this.showAlert('Failed to delete room. Please try again.', 'danger');
   }
+}
+
 
   showAlert(message, type = 'info') {
     document.querySelectorAll('.alert.position-fixed').forEach(el => el.remove());

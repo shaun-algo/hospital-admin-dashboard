@@ -4,18 +4,15 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
   http_response_code(204);
   exit;
 }
 
+include "connection.php";
+
 class Room {
   private function connect() {
-    include "connection.php"; // Database class returning PDO
     return (new Database())->connect();
   }
 
@@ -53,20 +50,38 @@ class Room {
         ORDER BY r.room_no
       ");
       $stmt->execute();
-      $rooms = $stmt->fetchAll(PDO::FETCH_ASSOC);
-      $this->respond($rooms);
+      $this->respond($stmt->fetchAll(PDO::FETCH_ASSOC));
     } catch (Exception $e) {
       $this->respond(["error" => "Failed to get rooms: " . $e->getMessage()], 500);
+    }
+  }
+
+  function getAvailableRooms() {
+    try {
+      $conn = $this->connect();
+      $stmt = $conn->prepare("
+        SELECT r.room_no, r.categoryid, r.floorid, r.status,
+               c.name AS category_name,
+               f.name AS floor_name
+        FROM Room r
+        LEFT JOIN Room_Category c ON r.categoryid = c.categoryid
+        LEFT JOIN Floor f ON r.floorid = f.floorid
+        WHERE r.status = 'Available'
+        ORDER BY r.room_no
+      ");
+      $stmt->execute();
+      $this->respond($stmt->fetchAll(PDO::FETCH_ASSOC));
+    } catch (Exception $e) {
+      $this->respond(["error" => "Failed to get available rooms: " . $e->getMessage()], 500);
     }
   }
 
   function insertRoom($data) {
     try {
       $conn = $this->connect();
-      $data = is_array($data) ? $data : json_decode($data, true);
       $this->validateRoomData($data);
 
-      // Prevent duplicate room_no
+      // prevent duplicate room numbers
       $check = $conn->prepare("SELECT COUNT(*) FROM Room WHERE room_no = :room_no");
       $check->execute([":room_no" => $data['room_no']]);
       if ($check->fetchColumn() > 0) {
@@ -79,7 +94,7 @@ class Room {
         ":room_no" => $data['room_no'],
         ":categoryid" => $data['categoryid'],
         ":floorid" => $data['floorid'],
-        ":status" => $data['status'],
+        ":status" => $data['status']
       ]);
       $this->respond(["success" => true, "room_no" => $data['room_no']], 201);
     } catch (PDOException $e) {
@@ -90,8 +105,17 @@ class Room {
   function updateRoom($data) {
     try {
       $conn = $this->connect();
-      $data = is_array($data) ? $data : json_decode($data, true);
       $this->validateRoomData($data);
+
+      // prevent changing to Occupied if already occupied
+      if ($data['status'] === "Occupied") {
+        $check = $conn->prepare("SELECT status FROM Room WHERE room_no = :room_no");
+        $check->execute([":room_no" => $data['room_no']]);
+        $existing = $check->fetch(PDO::FETCH_ASSOC);
+        if ($existing && $existing['status'] === "Occupied") {
+          $this->respond(["success" => false, "error" => "Room already occupied"], 409);
+        }
+      }
 
       $stmt = $conn->prepare("UPDATE Room
                               SET categoryid = :categoryid,
@@ -104,6 +128,10 @@ class Room {
         ":status" => $data['status'],
         ":room_no" => $data['room_no']
       ]);
+
+      if ($stmt->rowCount() === 0) {
+        $this->respond(["success" => false, "error" => "Room not found"], 404);
+      }
 
       $this->respond(["success" => true, "message" => "Room updated"]);
     } catch (PDOException $e) {
@@ -119,8 +147,11 @@ class Room {
       $conn = $this->connect();
 
       $stmt = $conn->prepare("DELETE FROM Room WHERE room_no = :room_no");
-      $stmt->bindParam(":room_no", $room_no, PDO::PARAM_STR);
-      $stmt->execute();
+      $stmt->execute([":room_no" => $room_no]);
+
+      if ($stmt->rowCount() === 0) {
+        $this->respond(["success" => false, "error" => "Room not found"], 404);
+      }
 
       $this->respond(["success" => true, "message" => "Room deleted"]);
     } catch (Exception $e) {
@@ -131,16 +162,14 @@ class Room {
 
 // --- ROUTER ---
 $input = json_decode(file_get_contents("php://input"), true) ?? [];
-$params = array_merge($_GET, $_POST, $input);
-$operation = $params['operation'] ?? '';
-$room_no = $params['roomid'] ?? $params['room_no'] ?? '';
-$jsonData = [];
-
-if (!empty($params['json'])) {
-  $jsonData = is_array($params['json']) ? $params['json'] : json_decode($params['json'], true);
-} else if (!empty($input) && !in_array($operation, ['getAllRooms', 'deleteRoom'])) {
-  $jsonData = $input;
+// handle "json" param from FormData
+if (isset($_POST['json'])) {
+  $input = json_decode($_POST['json'], true) ?? [];
 }
+$params = array_merge($_GET, $_POST, $input);
+
+$operation = $params['operation'] ?? '';
+$room_no = $params['room_no'] ?? '';
 
 $room = new Room();
 
@@ -148,17 +177,19 @@ switch ($operation) {
   case 'getAllRooms':
     $room->getAllRooms();
     break;
+  case 'getAvailableRooms':
+    $room->getAvailableRooms();
+    break;
   case 'insertRoom':
-    $room->insertRoom($jsonData);
+    $room->insertRoom($input);
     break;
   case 'updateRoom':
-    $room->updateRoom($jsonData);
+    $room->updateRoom($input);
     break;
   case 'deleteRoom':
     $room->deleteRoom($room_no);
     break;
   default:
+    http_response_code(400);
     echo json_encode(["error" => "Invalid operation"]);
-    break;
 }
-?>

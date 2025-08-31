@@ -1,287 +1,284 @@
 class DoctorAssignmentManager {
-  constructor(admissionId) {
-    this.baseApiUrl = 'http://localhost/hospital_billing2/api/transactions/doctor_assignment.php';
-    this.admissionId = admissionId;
-    this.doctors = [];
+  constructor() {
+    this.apiUrl = 'http://localhost/hospital_billing2/api/transactions/doctor_assignment.php';
     this.assignments = [];
-    this.init = this.init.bind(this);
-    this.setupEventListeners = this.setupEventListeners.bind(this);
-    this.saveAssignment = this.saveAssignment.bind(this);
-    this.resetForm = this.resetForm.bind(this);
-    this.openModal = this.openModal.bind(this);
-    this.loadDoctors = this.loadDoctors.bind(this);
-    this.loadAssignments = this.loadAssignments.bind(this);
-    this.deleteAssignment = this.deleteAssignment.bind(this);
+    this.doctors = [];
+    this.admissions = [];
     this.init();
   }
 
-  init() {
-    this.loadDoctors();
-    this.loadAssignments();
+  async init() {
+    await Promise.all([this.loadDoctors(), this.loadAdmissions()]);
+    await this.loadAssignments();
     this.setupEventListeners();
   }
 
   setupEventListeners() {
-    document.body.addEventListener('click', (e) => {
-      const target = e.target.closest('button');
-      if (!target) return;
+    document.getElementById('addAssignmentBtn').addEventListener('click', () => this.openModal('add'));
 
-      const action = target.getAttribute('data-action');
-      const id = target.getAttribute('data-id');
+    document.getElementById('doctorAssignmentTableBody').addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
 
-      if (target.id === 'addAssignmentBtn') {
-        this.openModal('add');
-        return;
-      }
-
-      if (!action || !id) return;
-
-      if (action === 'delete') {
-        this.openModal('delete', id);
-      }
-    });
-
-    document.body.addEventListener('submit', async (e) => {
-      if (e.target && e.target.id === 'doctorAssignmentForm') {
-        e.preventDefault();
-        await this.saveAssignment();
-      }
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+      const assignment = this.assignments.find(a => String(a.assignmentid) === String(id));
+      if (action === 'view') this.openModal('view', assignment);
+      else if (action === 'edit') this.openModal('edit', assignment);
+      else if (action === 'delete') this.softDeleteAssignment(id);
     });
   }
 
   async loadDoctors() {
     try {
-      const res = await axios.get('http://localhost/hospital_billing2/api/doctors.php', {
-        params: { operation: 'getAllDoctors' }
-      });
-      if (res.data.error) throw new Error(res.data.error);
+      const res = await axios.get('http://localhost/hospital_billing2/api/doctors.php', { params: { operation: 'getAllDoctors' } });
       this.doctors = Array.isArray(res.data) ? res.data : [];
-      console.log('Doctors loaded:', this.doctors.length);
-    } catch (err) {
-      console.error('Error loading doctors:', err);
+    } catch (e) {
+      console.error('Failed to load doctors', e);
       this.doctors = [];
+    }
+  }
+
+  async loadAdmissions() {
+    try {
+      const res = await axios.get('http://localhost/hospital_billing2/api/transactions/admission.php', { params: { operation: 'getActiveAdmissions' } });
+      this.admissions = Array.isArray(res.data) ? res.data : [];
+    } catch (e) {
+      console.error('Failed to load admissions', e);
+      this.admissions = [];
     }
   }
 
   async loadAssignments() {
     try {
-      const res = await axios.get(this.baseApiUrl, {
-        params: { operation: 'getAssignmentsByAdmission', admissionid: this.admissionId }
-      });
-      if (res.data.error) throw new Error(res.data.error);
-      this.assignments = Array.isArray(res.data) ? res.data : [];
-      this.renderAssignmentsTable();
-    } catch (err) {
-      console.error('Error loading assignments:', err);
-      this.assignments = [];
-      this.renderAssignmentsTable();
+      const res = await axios.get(this.apiUrl, { params: { operation: 'getAssignments' } });
+      if (res.data.success) {
+        this.assignments = res.data.data;
+        this.renderTable();
+      } else {
+        this.renderEmpty('Failed to load assignments: ' + (res.data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      this.renderEmpty('Error loading assignments.');
+      console.error(error);
     }
   }
 
-  renderAssignmentsTable() {
+  renderEmpty(message) {
     const tbody = document.getElementById('doctorAssignmentTableBody');
     if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">${message}</td></tr>`;
+  }
 
+  renderTable() {
+    const tbody = document.getElementById('doctorAssignmentTableBody');
+    if (!tbody) return;
     if (!this.assignments.length) {
-      tbody.innerHTML = `
-        <tr><td colspan="4" class="text-center text-muted py-3">No doctor assignments found.</td></tr>`;
+      this.renderEmpty('No doctor assignments found.');
       return;
     }
-
     tbody.innerHTML = this.assignments.map(a => `
       <tr>
-        <td>${a.fullname}</td>
-        <td>${a.role}</td>
-        <td>${a.notes || ''}</td>
+        <td>${this.escape(a.patient_name || 'Unknown')}</td>
+        <td>${this.escape(a.doctor_name || 'Unknown')}</td>
+        <td>${this.escape(a.notes || '')}</td>
         <td>
-          <button class="btn btn-sm btn-outline-danger" data-id="${a.assignmentid}" data-action="delete" title="Delete Assignment">
-            <i class="bi bi-trash"></i>
-          </button>
+          <button class="btn btn-info btn-sm me-1" data-id="${a.assignmentid}" data-action="view" title="View"><i class="bi bi-eye"></i></button>
+          <button class="btn btn-warning btn-sm me-1" data-id="${a.assignmentid}" data-action="edit" title="Edit"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-danger btn-sm" data-id="${a.assignmentid}" data-action="delete" title="Delete"><i class="bi bi-trash"></i></button>
         </td>
-      </tr>`).join('');
+      </tr>
+    `).join('');
   }
 
-  openModal(mode, assignmentId = null) {
-    const existingModal = document.getElementById('doctorAssignmentModal');
-    if (existingModal) existingModal.remove();
+  openModal(mode, assignment = null) {
+    document.getElementById('doctorAssignmentModal')?.remove();
 
-    let modalHtml = '';
+    const editing = mode === 'edit';
+    const viewing = mode === 'view';
+    const a = assignment || {};
 
-    if (mode === 'delete') {
-      const assignment = this.assignments.find(a => a.assignmentid == assignmentId);
-      modalHtml = this.getDeleteModalHtml(assignment);
-    } else if (mode === 'add') {
-      modalHtml = this.getFormModalHtml();
-    }
-
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modalEl = document.getElementById('doctorAssignmentModal');
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
-
-    if (mode === 'delete') {
-      modalEl.querySelector('#confirmDeleteBtn').addEventListener('click', async () => {
-        await this.deleteAssignment(assignmentId);
-        modal.hide();
-      });
-    }
-  }
-
-  getFormModalHtml() {
-    const title = 'Add Doctor Assignment';
-
-    const doctorOptions = this.doctors.map(doc => `
-      <option value="${doc.doctorid}">
-        ${doc.fullname} (${doc.specialty})
+    // Build admissions dropdown
+    const admissionOptions = this.admissions.map(adm => `
+      <option value="${adm.admissionid}" ${adm.admissionid === a.admissionid ? 'selected' : ''}>
+        ${this.escape(adm.patient_name)} - ${new Date(adm.admission_date).toLocaleDateString()}
       </option>`).join('');
 
-    return `
-      <div class="modal fade" id="doctorAssignmentModal" tabindex="-1" aria-labelledby="doctorAssignmentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-md modal-dialog-centered">
-          <div class="modal-content">
-            <form id="doctorAssignmentForm" novalidate>
+    // Build doctors dropdown
+    const doctorOptions = this.doctors.map(doc => `
+      <option value="${doc.doctorid}" ${doc.doctorid === a.doctorid ? 'selected' : ''}>
+        ${this.escape(doc.fullname)}${doc.specialty_name ? ' - ' + this.escape(doc.specialty_name) : ''}
+      </option>`).join('');
+
+    const modalHtml = `
+      <div class="modal fade" id="doctorAssignmentModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <form id="doctorAssignmentForm" class="needs-validation" novalidate>
+            <div class="modal-content">
+
               <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="doctorAssignmentModalLabel">${title}</h5>
+                <h5 class="modal-title" id="modalTitle">${viewing ? 'View' : editing ? 'Edit' : 'Add'} Doctor Assignment</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
+
               <div class="modal-body">
-                <input type="hidden" id="assignmentId" value="">
-                <div class="mb-3">
-                  <label for="doctorSelect" class="form-label">Select Doctor</label>
-                  <select id="doctorSelect" class="form-select" required>
-                    <option value="" disabled selected>Select a doctor</option>
-                    ${doctorOptions}
-                  </select>
-                  <div class="invalid-feedback">Please select a doctor.</div>
+
+                ${(editing || !viewing) ? `<input type="hidden" id="assignmentId" value="${a.assignmentid || ''}">` : ''}
+
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label for="admissionSelect" class="form-label">Admission</label>
+                    <select id="admissionSelect" class="form-select" ${viewing ? 'disabled' : 'required'}>
+                      <option value="">Select admission</option>
+                      ${admissionOptions}
+                    </select>
+                    <div class="invalid-feedback">Please select an admission.</div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <label for="doctorSelect" class="form-label">Doctor</label>
+                    <select id="doctorSelect" class="form-select" ${viewing ? 'disabled' : 'required'}>
+                      <option value="">Select doctor</option>
+                      ${doctorOptions}
+                    </select>
+                    <div class="invalid-feedback">Please select a doctor.</div>
+                  </div>
                 </div>
-                <div class="mb-3">
+
+                <div class="mb-3 mt-3">
                   <label for="roleInput" class="form-label">Role</label>
-                  <input type="text" id="roleInput" class="form-control" placeholder="e.g., Attending Physician" value="" required />
-                  <div class="invalid-feedback">Please enter the doctor's role.</div>
+                  <input type="text" id="roleInput" class="form-control" value="${a.role || ''}" ${viewing ? 'readonly' : 'required'}>
+                  <div class="invalid-feedback">Role is required.</div>
                 </div>
+
                 <div class="mb-3">
-                  <label for="notesTextarea" class="form-label">Notes (optional)</label>
-                  <textarea id="notesTextarea" class="form-control" rows="3"></textarea>
+                  <label for="notesTextarea" class="form-label">Notes</label>
+                  <textarea id="notesTextarea" class="form-control" rows="3" ${viewing ? 'readonly' : ''}>${a.notes || ''}</textarea>
                 </div>
-              </div>
-              <div class="modal-footer bg-light border-top">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>`;
-  }
 
-  getDeleteModalHtml(assignment) {
-    return `
-      <div class="modal fade" id="doctorAssignmentModal" tabindex="-1" aria-labelledby="doctorDeleteModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-              <h5 class="modal-title" id="doctorDeleteModalLabel">Delete Doctor Assignment</h5>
-              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              Are you sure you want to delete the assignment of <strong>${assignment.fullname}</strong> as <em>${assignment.role}</em>?
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-              <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
-            </div>
-          </div>
-        </div>
-      </div>`;
-  }
+                <div id="formAlert" class="alert alert-danger d-none"></div>
+              </div>
 
-  resetForm() {
-    const form = document.getElementById('doctorAssignmentForm');
-    if (form) form.reset();
-    const idElem = document.getElementById('assignmentId');
-    if (idElem) idElem.value = '';
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                ${!viewing ? `<button type="submit" class="btn btn-primary">${editing ? 'Update' : 'Add'}</button>` : ''}
+              </div>
+
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalElem = document.getElementById('doctorAssignmentModal');
+    const modal = new bootstrap.Modal(modalElem);
+    modal.show();
+
+    if (!viewing) {
+      const form = document.getElementById('doctorAssignmentForm');
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        this.saveAssignment();
+      });
+    }
+
+    modalElem.addEventListener('hidden.bs.modal', () => {
+      modalElem.remove();
+    });
   }
 
   async saveAssignment() {
-    const doctorSelect = document.getElementById('doctorSelect');
-    const roleInput = document.getElementById('roleInput');
-    const notesInput = document.getElementById('notesTextarea');
-
-    doctorSelect.classList.remove('is-invalid');
-    roleInput.classList.remove('is-invalid');
-
-    let valid = true;
-    if (!doctorSelect.value) {
-      doctorSelect.classList.add('is-invalid');
-      valid = false;
+    const form = document.getElementById('doctorAssignmentForm');
+    if (!form.checkValidity()) {
+      form.classList.add('was-validated');
+      return;
     }
-    if (!roleInput.value.trim()) {
-      roleInput.classList.add('is-invalid');
-      valid = false;
+
+    const id = document.getElementById('assignmentId')?.value || null;
+    const admissionId = document.getElementById('admissionSelect').value;
+    const doctorId = document.getElementById('doctorSelect').value;
+    const role = document.getElementById('roleInput').value.trim();
+    const notes = document.getElementById('notesTextarea').value.trim();
+
+    if (!admissionId || !doctorId) {
+      this.showFormAlert('Admission and Doctor must be selected.');
+      return;
     }
-    if (!valid) return;
-
-    const payload = {
-      admissionid: this.admissionId,
-      doctorid: doctorSelect.value,
-      role: roleInput.value.trim(),
-      notes: (notesInput.value || '').trim()
-    };
-
-    const submitBtn = document.querySelector('#doctorAssignmentForm button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
 
     try {
-      const res = await axios.post(this.baseApiUrl, {
-        operation: 'insertAssignment',
-        json: JSON.stringify(payload)   // ✅ Always send JSON string
-      });
+      const operation = id ? 'updateAssignment' : 'insertAssignment';
+      const payload = { assignmentid: id, admissionid: admissionId, doctorid: doctorId, role, notes };
+      const res = await axios.post(this.apiUrl, { operation, json: JSON.stringify(payload) });
 
-      if (res.data.error) throw new Error(res.data.error);
+      if (!res.data.success) throw new Error(res.data.error || 'Failed to save assignment.');
 
-      const modalEl = document.getElementById('doctorAssignmentModal');
-      const modal = bootstrap.Modal.getInstance(modalEl);
-      modal.hide();
+      bootstrap.Modal.getInstance(document.getElementById('doctorAssignmentModal')).hide();
 
-      this.resetForm();
       await this.loadAssignments();
+      this.showAlert('Assignment saved successfully.', 'success');
+
     } catch (err) {
-      alert(`Failed to save assignment: ${err.message}`);
-      console.error(err);
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = originalText;
+      this.showFormAlert(err.message || 'Failed to save assignment.');
     }
   }
 
-  async deleteAssignment(assignmentId) {
-    try {
-      const res = await axios.post(this.baseApiUrl, {
-        operation: 'deleteAssignment',
-        assignmentid: assignmentId
-      });
+  async softDeleteAssignment(id) {
+    if (!confirm('Are you sure you want to delete this assignment?')) return;
 
-      if (res.data.error) throw new Error(res.data.error);
+    try {
+      const res = await axios.post(this.apiUrl, { operation: 'deleteAssignment', assignmentid: id });
+      if (!res.data.success) throw new Error(res.data.error || 'Delete failed');
       await this.loadAssignments();
+      this.showAlert('Assignment deleted successfully.', 'success');
     } catch (err) {
-      alert(`Failed to delete assignment: ${err.message}`);
-      console.error(err);
+      this.showAlert(err.message || 'Failed to delete.', 'danger');
     }
+  }
+
+  showFormAlert(message) {
+    const alertBox = document.getElementById('formAlert');
+    if (!alertBox) return;
+    alertBox.classList.remove('d-none');
+    alertBox.textContent = message;
+  }
+
+  showAlert(message, type = 'info') {
+    document.querySelectorAll('.alert-floating').forEach(a => a.remove());
+
+    const iconMap = {
+      info: 'info-circle',
+      success: 'check-circle',
+      danger: 'exclamation-triangle'
+    };
+
+    const icon = iconMap[type] || 'info-circle';
+
+    const html = `
+      <div class="alert alert-${type} alert-dismissible fade show alert-floating position-fixed top-0 end-0 m-3" style="min-width: 250px; z-index: 1060;">
+        <i class="bi bi-${icon} me-2"></i>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+    setTimeout(() => {
+      const alert = document.querySelector('.alert-floating');
+      if (alert) bootstrap.Alert.getOrCreateInstance(alert).close();
+    }, 4000);
+  }
+
+  escape(str) {
+    if (!str && str !== 0) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  document.body.addEventListener("click", (e) => {
-    const btn = e.target.closest(".manage-assignments-btn");
-    if (btn) {
-      const admissionId = btn.dataset.admissionid;
-      // pass module key + extra params to loader
-      loadModule("doctor_assignment", { admissionId });
-    }
-  });
+document.addEventListener('DOMContentLoaded', () => {
+  window.doctorAssignmentManager = new DoctorAssignmentManager();
 });
-

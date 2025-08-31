@@ -12,7 +12,7 @@ class AdmissionManager {
   }
 
   async init() {
-    await this.loadAdmissions(); // Load admissions first for filtering patients
+    await this.loadAdmissions();
     await this.loadPatients();
     await this.loadDoctors();
     await this.loadUsers();
@@ -55,7 +55,6 @@ class AdmissionManager {
     try {
       const res = await axios.get(BASE_API_URL + 'patients.php', { params: { operation: 'getAll' } });
       let allPatients = Array.isArray(res.data) ? res.data : [];
-      // Filter out patients currently admitted (status not discharged or closed)
       const admittedPatientIds = new Set(this.admissions
         .filter(a => a.status !== 'Discharged' && a.status !== 'Closed')
         .map(a => a.patientid));
@@ -64,6 +63,7 @@ class AdmissionManager {
       this.patients = [];
     }
   }
+
   async loadDoctors() {
     try {
       const res = await axios.get(BASE_API_URL + 'doctors.php', { params: { operation: 'getAllDoctors' } });
@@ -98,13 +98,13 @@ class AdmissionManager {
         <td>${this.escape(a.status)}</td>
         <td>
           <div style="display: flex; flex-direction: row; gap: 8px; flex-wrap: nowrap;">
-            <button title="View Admission" class="btn btn-sm btn-info me-1" style="flex-shrink: 0;" data-id="${this.escape(a.admissionid)}" data-action="view">
+            <button title="View Admission" class="btn btn-sm btn-info me-1" data-id="${this.escape(a.admissionid)}" data-action="view">
               <i class="bi bi-eye"></i>
             </button>
-            <button title="Edit Admission" class="btn btn-sm btn-warning me-1" style="flex-shrink: 0;" data-id="${this.escape(a.admissionid)}" data-action="edit">
+            <button title="Edit Admission" class="btn btn-sm btn-warning me-1" data-id="${this.escape(a.admissionid)}" data-action="edit">
               <i class="bi bi-pencil"></i>
             </button>
-            <button title="Delete Admission" class="btn btn-sm btn-danger" style="flex-shrink: 0;" data-id="${this.escape(a.admissionid)}" data-action="delete">
+            <button title="Delete Admission" class="btn btn-sm btn-danger" data-id="${this.escape(a.admissionid)}" data-action="delete">
               <i class="bi bi-trash"></i>
             </button>
           </div>
@@ -116,8 +116,7 @@ class AdmissionManager {
   openModal(mode, admission = null) {
     document.querySelectorAll('#admissionModal').forEach(m => m.remove());
 
-    let title = '';
-    let body = '';
+    let title, body;
 
     if (mode === 'view') {
       title = 'View Admission';
@@ -130,20 +129,27 @@ class AdmissionManager {
       `;
     } else if (mode === 'delete') {
       title = 'Confirm Delete Admission';
-      body = `<p>Are you sure you want to delete admission record for <strong>${this.escape(admission.patient_name)}</strong>?</p>`;
+      body = `<p>Are you sure to delete admission record for <strong>${this.escape(admission.patient_name)}</strong>?</p>`;
     } else {
       title = mode === 'add' ? 'Add Admission' : 'Edit Admission';
+
       body = `
         <form id="admissionForm" class="needs-validation" novalidate>
           <input type="hidden" id="admissionId" value="${admission ? this.escape(admission.admissionid) : ''}" />
+
           <div class="mb-3">
             <label for="patientId" class="form-label">Patient</label>
-            <select id="patientId" class="form-select" required>
-              <option value="">Select Patient</option>
-              ${this.patients.map(p => `<option value="${this.escape(p.patientid)}" ${admission && admission.patientid == p.patientid ? 'selected' : ''}>${this.escape(p.fullname)}</option>`).join('')}
-            </select>
-            <div class="invalid-feedback">Please select a patient.</div>
+            ${mode === 'add' ? `
+              <select id="patientId" class="form-select" required>
+                <option value="">Select Patient</option>
+                ${this.patients.map(p => `<option value="${this.escape(p.patientid)}">${this.escape(p.fullname)}</option>`).join('')}
+              </select>
+              <div class="invalid-feedback">Please select a patient.</div>
+            ` : `
+              <input type="text" class="form-control" id="patientName" value="${admission ? this.escape(admission.patient_name) : ''}" readonly />
+            `}
           </div>
+
           <div class="mb-3">
             <label for="doctorId" class="form-label">Doctor</label>
             <select id="doctorId" class="form-select" required>
@@ -152,6 +158,7 @@ class AdmissionManager {
             </select>
             <div class="invalid-feedback">Please select a doctor.</div>
           </div>
+
           <div class="mb-3">
             <label for="userId" class="form-label">User</label>
             <select id="userId" class="form-select" required>
@@ -160,32 +167,35 @@ class AdmissionManager {
             </select>
             <div class="invalid-feedback">Please select a user.</div>
           </div>
+
           <div class="mb-3">
             <label for="admissionDate" class="form-label">Admission Date</label>
             <input type="date" id="admissionDate" class="form-control" value="${admission ? this.escape(admission.admission_date) : new Date().toISOString().split('T')[0]}" required />
             <div class="invalid-feedback">Please enter an admission date.</div>
           </div>
+
           ${mode === 'edit' ? `
           <div class="mb-3">
             <label for="admissionStatus" class="form-label">Status</label>
             <select id="admissionStatus" class="form-select" required>
-              <option value="">Select Status</option>
               <option value="Admitted" ${admission.status === 'Admitted' ? 'selected' : ''}>Admitted</option>
               <option value="Discharged" ${admission.status === 'Discharged' ? 'selected' : ''}>Discharged</option>
               <option value="Transferred" ${admission.status === 'Transferred' ? 'selected' : ''}>Transferred</option>
               <option value="Pending" ${admission.status === 'Pending' ? 'selected' : ''}>Pending</option>
             </select>
             <div class="invalid-feedback">Please select a status.</div>
-          </div>` : ''}
+          </div>` : ``}
         </form>
       `;
     }
+
+    const headerColor = mode === 'add' ? 'bg-success' : mode === 'edit' ? 'bg-warning' : mode === 'delete' ? 'bg-danger' : 'bg-primary';
 
     const modalHtml = `
       <div class="modal fade" id="admissionModal" tabindex="-1" aria-labelledby="admissionModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
-            <div class="modal-header ${mode === 'delete' ? 'bg-danger text-white' : 'bg-primary text-white'}">
+            <div class="modal-header ${headerColor} text-white">
               <h5 class="modal-title" id="admissionModalLabel">${title}</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -215,31 +225,39 @@ class AdmissionManager {
   }
 
   async saveAdmission(mode, modal) {
-    const form = document.getElementById('admissionForm');
-    if (!form.checkValidity()) {
-      form.classList.add('was-validated');
-      return;
-    }
-
-    const data = {
-      admissionid: this.escape(form.querySelector('#admissionId').value) || null,
-      patientid: this.escape(form.querySelector('#patientId').value),
-      doctorid: this.escape(form.querySelector('#doctorId').value),
-      userid: this.escape(form.querySelector('#userId').value),
-      admission_date: this.escape(form.querySelector('#admissionDate').value),
-      status: mode === 'add' ? 'Admitted' : this.escape(form.querySelector('#admissionStatus').value)
-    };
-
-    try {
-      const res = await axios.post(this.apiUrl, { operation: mode === 'add' ? 'insertAdmission' : 'updateAdmission', ...data });
-      if (res.data.success === false) throw new Error(res.data.error);
-      this.showAlert(`Admission ${mode === 'edit' ? 'updated' : 'added'} successfully!`, 'success');
-      modal.hide();
-      this.loadAdmissions();
-    } catch (err) {
-      this.showAlert(`Failed to save admission: ${err.message}`, 'danger');
-    }
+  const form = document.getElementById('admissionForm');
+  if (!form.checkValidity()) {
+    form.classList.add('was-validated');
+    return;
   }
+
+  const data = {
+    admissionid: this.escape(form.querySelector('#admissionId').value) || null,
+    patientid: mode === 'add'
+      ? this.escape(form.querySelector('#patientId').value)
+      : this.admissions.find(a => String(a.admissionid) === String(form.querySelector('#admissionId').value))?.patientid,
+    doctorid: this.escape(form.querySelector('#doctorId').value),
+    userid: this.escape(form.querySelector('#userId').value),
+    admission_date: this.escape(form.querySelector('#admissionDate').value),
+    status: mode === 'add'
+      ? 'Admitted'   // DB default fallback
+      : this.escape(form.querySelector('#admissionStatus').value)
+  };
+
+  try {
+    const res = await axios.post(this.apiUrl, {
+      operation: mode === 'add' ? 'insertAdmission' : 'updateAdmission',
+      ...data
+    });
+    if (res.data.success === false) throw new Error(res.data.error);
+    this.showAlert(`Admission ${mode === 'edit' ? 'updated' : 'added'} successfully!`, 'success');
+    modal.hide();
+    this.loadAdmissions();
+  } catch (err) {
+    this.showAlert(`Failed to save admission: ${err.message}`, 'danger');
+  }
+}
+
 
   async deleteAdmission(id, modal) {
     try {
